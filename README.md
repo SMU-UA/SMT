@@ -13,7 +13,7 @@ This tool sniffs Modbus RTU traffic on the serial bus between three slaves (S1_I
 3. Click **Connect Serial** and select the Modbus RTU COM port
 4. Go to the **Data Log** tab
 5. Click **Start Test** to begin scenario sequencing and data recording
-6. CSV is saved automatically when all scenarios complete or when you press **Stop Test**
+6. CSV is saved automatically when all scenarios complete (use **Download CSV** for manual saves)
 
 ## Requirements
 
@@ -45,7 +45,8 @@ No other software or Python packages need to be installed.
 - Analog values (VDC, IINV1, IINV2, VO1, VO2, VG1, VG2, FRQI, FRQG, etc.) are scaled by /10
 - Status registers (SSRS, FCODE, STATE, INVCOMMAND, etc.) logged as raw integers
 - Relative time in seconds from test start
-- Auto-saves CSV on test completion or manual stop
+- Auto-saves CSV when all scenarios complete naturally
+- Manual download available via **Download CSV** button
 - CSV filename includes date/time: `HMI_DataLog_2026-02-10_22-15-30.csv`
 
 ### Scenario Sequencer
