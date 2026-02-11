@@ -828,11 +828,8 @@
             // Reset scenario display
             document.getElementById('scNum').textContent = '0';
             document.getElementById('scLabel').textContent = 'Starting...';
-            // Stop any previous run first, then start fresh
-            fetch('/stop', { method: 'POST' }).catch(() => {});
-            setTimeout(() => {
-                fetch('/start', { method: 'POST' }).catch(() => {});
-            }, 500);
+            // Tell server to launch pytest
+            fetch('/start', { method: 'POST' }).catch(() => {});
             dataLogStartTime = Date.now();
             dataLogRecording = true;
             dataLogSeenRunning = false;
@@ -901,20 +898,10 @@
                     dot.classList.toggle('active', data.scenario > 0);
                 }
 
-                // Auto-stop logging when scenarios finish or are stopped
-                // Only trigger after server has actually started (prevents race condition)
+                // Update label when scenarios finish (recording continues until manual Stop Test)
                 if (data.running === false && dataLogRecording && dataLogSeenRunning) {
-                    fetch('/stop', { method: 'POST' }).catch(() => {});
-                    dataLogRecording = false;
-                    if (dataLogTimer) { clearInterval(dataLogTimer); dataLogTimer = null; }
-                    document.getElementById('recDot').classList.remove('recording');
-                    document.getElementById('startLogBtn').style.display = '';
-                    document.getElementById('stopLogBtn').style.display = 'none';
-                    document.getElementById('scNum').textContent = '0';
                     document.getElementById('scLabel').textContent = 'Test complete';
                     document.getElementById('scDot').classList.remove('active');
-                    // Auto-save CSV
-                    if (dataLogRows.length > 0) downloadDataLog();
                 }
 
                 // Add marker to log only when test is running

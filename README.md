@@ -27,9 +27,9 @@ No other software or Python packages need to be installed.
 | File | Description |
 |------|-------------|
 | `START_SMU_Sniffer.bat` | One-click launcher - finds Typhoon Python, starts server, opens browser |
-| `scenario_server.py` | Python HTTP server - serves the HTML page, broadcasts scenario numbers via SSE |
+| `scenario_server.py` | Python HTTP server - serves HTML, launches pytest, relays scenario updates via SSE |
 | `Modbus_Bus_Sniffer.html` | Browser UI - Modbus sniffer, live register display, data logging |
-| `SystemLevel_Scenarios.py` | Original Typhoon HIL test definitions (reference only, not executed) |
+| `SystemLevel_Scenarios.py` | Typhoon HIL pytest test suite - executed by the server, reports scenarios back via HTTP |
 | `run_server.ps1` | PowerShell helper to run the server manually |
 
 ## Features
@@ -51,30 +51,33 @@ No other software or Python packages need to be installed.
 
 ### Scenario Sequencer
 - 66 test scenarios across 6 test groups:
-  - SA_CurrentLimit_Line (10 scenarios, 25s each)
-  - SA_CurrentLimit_Phase (10 scenarios, 27s each)
-  - GridConnection_LineLoad (16 scenarios, 107s each)
-  - GridConnection_PhaseLoad (16 scenarios, 107s each)
-  - GC_currentlimit (4 scenarios, 100s each)
-  - Startup_GC_Bat_first (10 scenarios, 30s each)
-- Browser controls start/stop - Python waits for the Start Test button
+  - SA_CurrentLimit_Line (10 scenarios)
+  - SA_CurrentLimit_Phase (10 scenarios)
+  - GridConnection_LineLoad (16 scenarios)
+  - GridConnection_PhaseLoad (16 scenarios)
+  - GC_currentlimit (4 scenarios)
+  - Startup_GC_Bat_first (10 scenarios)
+- **Start Test** launches `pytest SystemLevel_Scenarios.py` as a subprocess
+- Each test function reports its scenario to the server via HTTP POST
+- **Stop Test** terminates the pytest subprocess
 - Live scenario indicator bar shows current scenario number and name
+- Tests also work standalone (`pytest SystemLevel_Scenarios.py`) without the server
 
 ## Architecture
 
 ```
-Browser (Chrome/Edge)          Python Server (localhost:8765)
-+-----------------------+      +-------------------------+
-| Modbus Sniffer (HTML) |      | scenario_server.py      |
-|                       |      |                         |
-| Web Serial API -----> |      |  GET /        -> HTML   |
-|   (COM port sniff)    |      |  GET /events  -> SSE    |
-|                       | SSE  |  POST /start  -> begin  |
-| EventSource <---------|------|  POST /stop   -> halt   |
-|                       |      |                         |
-| Start Test  --------->|------|  Scenario sequencer     |
-| Stop Test   --------->|------|  (timed steps)          |
-+-----------------------+      +-------------------------+
+Browser (Chrome/Edge)          Python Server (localhost:8765)        pytest subprocess
++-----------------------+      +-------------------------+      +-------------------------+
+| Modbus Sniffer (HTML) |      | scenario_server.py      |      | SystemLevel_Scenarios.py |
+|                       |      |                         |      |                         |
+| Web Serial API -----> |      |  GET /        -> HTML   |      | test_SA_CurrentLimit_*  |
+|   (COM port sniff)    |      |  GET /events  -> SSE    |      | test_GridConnection_*   |
+|                       | SSE  |  POST /start  -> pytest |----->| test_GC_currentLimit    |
+| EventSource <---------|------|  POST /stop   -> kill   |      | test_Startup1           |
+|                       |      |  POST /scenario <- recv |<-----|  report_scenario(label) |
+| Start Test  --------->|------|                         |      |                         |
+| Stop Test   --------->|------|  monitor subprocess     |      | Typhoon HIL hardware    |
++-----------------------+      +-------------------------+      +-------------------------+
 ```
 
 ## Modbus Slave Addresses

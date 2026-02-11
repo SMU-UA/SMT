@@ -1,5 +1,7 @@
 import io
+import json
 import time
+import urllib.request
 from pathlib import Path
 
 from typhoon.api.schematic_editor import SchematicAPI
@@ -67,6 +69,21 @@ harmonics0.append(harmonic11_0)
 
 Stiff = 0
 Weak = 1e-3
+
+# --- Scenario reporting to SMT server ---
+def report_scenario(scenario_num, label=""):
+    """Report the current scenario to the SMT server (if running)."""
+    payload = json.dumps({"scenario": scenario_num, "label": label}).encode("utf-8")
+    req = urllib.request.Request(
+        "http://localhost:8765/scenario",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass  # Server not running - tests still work standalone
+
 # script directory
 FILE_DIR_PATH = Path(__file__).parent
 
@@ -185,6 +202,7 @@ Scenario_data=[(1,10),(2,8),(3,6),(4,5),(5,4),(6,3),(7,2),(8,1),(9,0.5),(10,0.2)
 def test_SA_CurrentLimit_Line(setup,Scenario_num,R_fault_value):
     
     label = f"SA_CurrentLimit_Line_R_{Scenario_num}"
+    report_scenario(Scenario_num, label)
 
     hil.stop_simulation()
     
@@ -220,6 +238,7 @@ Scenario_data=[(1,10),(2,8),(3,6),(4,5),(5,4),(6,3),(7,2),(8,1),(9,0.5),(10,0.2)
 def test_SA_CurrentLimit_Phase(setup,Scenario_num,R_fault_value):
     
     label = f"SA_CurrentLimit_Phase_R_{Scenario_num}"
+    report_scenario(Scenario_num, label)
 
     hil.stop_simulation()
 
@@ -263,6 +282,7 @@ Scenario_data=[(1,harmonics0,1000,Stiff),(2,harmonics0,20,Stiff),
 def test_GridConnection_lineLoad(setup,Scenario_num,harm,rl,Lg):
     
     label = f"GridConnection_LineLoad_{Scenario_num}"
+    report_scenario(Scenario_num, label)
 
     hil.stop_simulation()
 
@@ -312,6 +332,7 @@ def test_GridConnection_PhaseLoad(setup,Scenario_num,harm,rl,Lg):
 
     
     label = f"GridConnection_PhaseLoad_{Scenario_num}"
+    report_scenario(Scenario_num, label)
 
     hil.stop_simulation()
 
@@ -355,6 +376,7 @@ Scenario_data=[(1,harmonics0,Stiff),(2,harmonics,Stiff),(3,harmonics0,Weak),(4,h
 def test_GC_currentLimit(setup, Scenario_num, harm,Lg):
     
     label = f"GC_currentlimit_{Scenario_num}"
+    report_scenario(Scenario_num, label)
 
     hil.stop_simulation()
     set_resistor_value("R5", 2000)
@@ -446,6 +468,7 @@ Scenario_data=[(1,harmonics0,Stiff,0),(2,harmonics0,Stiff,1),(3,harmonics0,Stiff
 def test_Startup1(setup, Scenario_num, harm,Lg,Td):
     
     label = f"Startup_GC_Bat_first_{Scenario_num}"
+    report_scenario(Scenario_num, label)
 
     hil.stop_simulation()
     set_resistor_value("R5", 2000)
