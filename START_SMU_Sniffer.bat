@@ -1,10 +1,10 @@
 @echo off
-title SMU Modbus Sniffer
+title SMT - System Monitoring Tool
 color 0B
 
 echo.
 echo  ============================================
-echo    SMU Modbus Bus Sniffer + Scenario Logger
+echo    SMT - System Monitoring Tool
 echo  ============================================
 echo.
 
@@ -30,7 +30,7 @@ echo  Starting server...
 echo  Browser will open automatically.
 echo.
 echo  -----------------------------------------------
-echo   DO NOT CLOSE THIS WINDOW while using sniffer
+echo   DO NOT CLOSE THIS WINDOW while using SMT
 echo  -----------------------------------------------
 echo.
 

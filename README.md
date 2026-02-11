@@ -1,6 +1,6 @@
-# SMU Modbus Bus Sniffer + Scenario Test Runner
+# SMT - System Monitoring Tool
 
-A browser-based Modbus RTU bus sniffer with integrated test scenario sequencing for SMU (Smart Management Unit) system-level testing.
+A browser-based Modbus RTU bus sniffer with integrated test scenario sequencing for SMU (System Master Unit) system-level testing.
 
 ## Overview
 
