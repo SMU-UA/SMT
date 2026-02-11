@@ -775,6 +775,7 @@
         let dataLogTimer = null;
         let dataLogRecording = false;
         let dataLogStartTime = 0;
+        let dataLogSeenRunning = false;
         const DATALOG_SKIP = new Set(['LIVE', 'R1', 'R2', 'R3', 'R4', 'R5', 'TEMPC', 'T2', 'INVLIVE', 'CHLIVE', 'TEMPE']);
         const DATALOG_NO_SCALE = new Set(['SSRS', 'FCODE', 'FTRIG', 'FFLAG', 'STATE', 'FCC', 'FFC', 'INVCOMMAND', 'CHCOMMAND', 'HRELAY', 'GENS']);
         const DATALOG_S3_INDICES = S3_WRITE_LABELS.map((l, i) => i).filter(i => !DATALOG_SKIP.has(S3_WRITE_LABELS[i]));
@@ -824,10 +825,17 @@
             document.getElementById('datalogBody').innerHTML = '';
             document.getElementById('recInfo').textContent = 'Rows: 0';
             document.getElementById('datalogCount').textContent = '0';
-            // Tell Python server to start scenarios
-            fetch('/start', { method: 'POST' }).catch(() => {});
+            // Reset scenario display
+            document.getElementById('scNum').textContent = '0';
+            document.getElementById('scLabel').textContent = 'Starting...';
+            // Stop any previous run first, then start fresh
+            fetch('/stop', { method: 'POST' }).catch(() => {});
+            setTimeout(() => {
+                fetch('/start', { method: 'POST' }).catch(() => {});
+            }, 500);
             dataLogStartTime = Date.now();
             dataLogRecording = true;
+            dataLogSeenRunning = false;
             document.getElementById('recDot').classList.add('recording');
             document.getElementById('startLogBtn').style.display = 'none';
             document.getElementById('stopLogBtn').style.display = '';
@@ -839,13 +847,14 @@
             if (!dataLogRecording) return;
             // Tell Python server to stop scenarios
             fetch('/stop', { method: 'POST' }).catch(() => {});
+            document.getElementById('scNum').textContent = '0';
+            document.getElementById('scLabel').textContent = 'Stopped';
+            document.getElementById('scDot').classList.remove('active');
             dataLogRecording = false;
             if (dataLogTimer) { clearInterval(dataLogTimer); dataLogTimer = null; }
             document.getElementById('recDot').classList.remove('recording');
             document.getElementById('startLogBtn').style.display = '';
             document.getElementById('stopLogBtn').style.display = 'none';
-            // Auto-save CSV
-            if (dataLogRows.length > 0) downloadDataLog();
         }
 
         function clearDataLog() {
@@ -882,24 +891,34 @@
             };
             evtSource.onmessage = (e) => {
                 const data = JSON.parse(e.data);
-                document.getElementById('scNum').textContent = data.scenario || '0';
-                document.getElementById('scLabel').textContent = data.label || '';
-                const dot = document.getElementById('scDot');
-                dot.classList.toggle('active', data.scenario > 0);
+
+                // Only update scenario display when test is running
+                if (dataLogRecording) {
+                    if (data.running === true) dataLogSeenRunning = true;
+                    document.getElementById('scNum').textContent = data.scenario || '0';
+                    document.getElementById('scLabel').textContent = data.label || '';
+                    const dot = document.getElementById('scDot');
+                    dot.classList.toggle('active', data.scenario > 0);
+                }
 
                 // Auto-stop logging when scenarios finish or are stopped
-                if (data.running === false && dataLogRecording) {
+                // Only trigger after server has actually started (prevents race condition)
+                if (data.running === false && dataLogRecording && dataLogSeenRunning) {
+                    fetch('/stop', { method: 'POST' }).catch(() => {});
                     dataLogRecording = false;
                     if (dataLogTimer) { clearInterval(dataLogTimer); dataLogTimer = null; }
                     document.getElementById('recDot').classList.remove('recording');
                     document.getElementById('startLogBtn').style.display = '';
                     document.getElementById('stopLogBtn').style.display = 'none';
+                    document.getElementById('scNum').textContent = '0';
+                    document.getElementById('scLabel').textContent = 'Test complete';
+                    document.getElementById('scDot').classList.remove('active');
                     // Auto-save CSV
                     if (dataLogRows.length > 0) downloadDataLog();
                 }
 
-                // Add marker to log
-                if (data.scenario > 0) {
+                // Add marker to log only when test is running
+                if (data.scenario > 0 && dataLogRecording) {
                     const log = document.getElementById('logPanel');
                     const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
                     const marker = document.createElement('div');
