@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMU Modbus Bus Sniffer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1a1a2e; color: #eee; padding: 10px; }
+        h1 { text-align: center; color: #00d4ff; margin-bottom: 10px; font-size: 1.4em; }
+        .panel { background: #16213e; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+        .conn-panel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        button { background: #0f3460; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1a5a8a; }
+        button.disconnect { background: #e94560; }
+        select { padding: 8px; border-radius: 4px; background: #0f3460; color: #fff; border: none; }
+        .status { padding: 4px 12px; border-radius: 12px; font-size: 0.85em; }
+        .connected { background: #00bf63; color: #000; }
+        .disconnected { background: #666; }
+        .stats { display: flex; gap: 15px; margin-left: auto; }
+        .stat-item { text-align: center; }
+        .stat-item .value { font-size: 1.2em; font-weight: bold; color: #00d4ff; }
+        .stat-item .label { font-size: 0.75em; color: #888; }
+
+        /* Tabs */
+        .tab-container { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
+        .tab { padding: 8px 16px; border-radius: 4px 4px 0 0; cursor: pointer; background: #0f3460; border: 1px solid #333; border-bottom: none; }
+        .tab.active { background: #16213e; color: #00d4ff; border-color: #00d4ff; }
+        .tab .badge { background: #00d4ff; color: #000; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-left: 5px; }
+        .tab.s1 { border-left: 3px solid #ff6b6b; }
+        .tab.s2 { border-left: 3px solid #ffd93d; }
+        .tab.s3 { border-left: 3px solid #6bcb77; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Data grids */
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
+        .data-item { background: #0f3460; padding: 6px; border-radius: 4px; text-align: center; }
+        .data-item .label { font-size: 0.65em; color: #888; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .data-item .value { font-size: 1em; font-weight: bold; color: #00ff88; }
+        .data-item.s1 .value { color: #ff6b6b; }
+        .data-item.s2 .value { color: #ffd93d; }
+        .data-item.s3 .value { color: #6bcb77; }
+        .data-item.web-ref .value { color: #00d4ff; }
+
+        .section-title { color: #00d4ff; font-size: 0.85em; margin: 8px 0 6px 0; border-bottom: 1px solid #333; padding-bottom: 4px; }
+
+        /* Log panel */
+        .log-panel { height: 300px; overflow-y: auto; background: #0a0a1a; border-radius: 4px; padding: 8px; font-family: monospace; font-size: 0.75em; }
+        .log-entry { margin-bottom: 4px; padding: 4px; border-radius: 2px; white-space: pre-wrap; word-break: break-all; }
+        .log-entry.tx { background: #1a3a1a; border-left: 3px solid #00ff00; }
+        .log-entry.rx { background: #1a1a3a; border-left: 3px solid #00aaff; }
+        .log-entry.error { background: #3a1a1a; border-left: 3px solid #ff0000; }
+        .log-entry.s1 { border-left-color: #ff6b6b; }
+        .log-entry.s2 { border-left-color: #ffd93d; }
+        .log-entry.s3 { border-left-color: #6bcb77; }
+        .log-time { color: #666; }
+        .log-slave { font-weight: bold; margin: 0 5px; }
+        .log-slave.s1 { color: #ff6b6b; }
+        .log-slave.s2 { color: #ffd93d; }
+        .log-slave.s3 { color: #6bcb77; }
+        .log-hex { color: #ffaa00; }
+        .log-parsed { color: #88ff88; }
+
+        .clear-btn { background: #333; padding: 4px 10px; font-size: 0.8em; }
+        .filter-btn { background: #0f3460; padding: 4px 10px; font-size: 0.8em; margin-left: 5px; }
+        .filter-btn.active { background: #00d4ff; color: #000; }
+
+        /* Slave indicators */
+        .slave-status { display: flex; gap: 10px; margin-left: 20px; }
+        .slave-indicator { display: flex; align-items: center; gap: 5px; font-size: 0.8em; }
+        .slave-dot { width: 10px; height: 10px; border-radius: 50%; background: #444; }
+        .slave-dot.active { animation: pulse 1s infinite; }
+        .slave-dot.s1 { background: #ff6b6b; }
+        .slave-dot.s2 { background: #ffd93d; }
+        .slave-dot.s3 { background: #6bcb77; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* Scenario indicator */
+        .scenario-bar { display: flex; align-items: center; gap: 12px; background: #0a0a1a; border: 1px solid #333; border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; }
+        .scenario-bar .sc-dot { width: 10px; height: 10px; border-radius: 50%; background: #666; }
+        .scenario-bar .sc-dot.active { background: #00ff88; animation: pulse 1s infinite; }
+        .scenario-bar .sc-num { font-size: 1.4em; font-weight: bold; color: #00d4ff; min-width: 36px; text-align: center; }
+        .scenario-bar .sc-label { color: #ccc; font-size: 0.9em; }
+        .scenario-bar .sc-status { margin-left: auto; font-size: 0.8em; padding: 3px 10px; border-radius: 10px; }
+        .scenario-bar .sc-status.connected { background: #00bf63; color: #000; }
+        .scenario-bar .sc-status.disconnected { background: #666; color: #fff; }
+
+        /* Data Log */
+        .log-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+        .log-controls .rec-dot { width: 12px; height: 12px; border-radius: 50%; background: #666; display: inline-block; }
+        .log-controls .rec-dot.recording { background: #ff0000; animation: pulse 0.8s infinite; }
+        .log-controls .rec-info { color: #888; font-size: 0.8em; margin-left: auto; }
+        button.start-log { background: #00bf63; color: #000; }
+        button.stop-log { background: #e94560; }
+        button.download-log { background: #0f3460; }
+        .data-log-table-wrap { max-height: 400px; overflow: auto; background: #0a0a1a; border-radius: 4px; }
+        .data-log-table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 0.7em; }
+        .data-log-table th { position: sticky; top: 0; background: #0f3460; color: #00d4ff; padding: 4px 6px; text-align: center; white-space: nowrap; border: 1px solid #333; z-index: 1; }
+        .data-log-table td { padding: 3px 6px; text-align: center; border: 1px solid #1a1a3a; white-space: nowrap; }
+        .data-log-table tr:nth-child(even) { background: #0d0d2a; }
+        .data-log-table tr:nth-child(odd) { background: #0a0a1a; }
+        .data-log-table td.sc-col { color: #aa55ff; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>SMU Modbus Bus Sniffer</h1>
+
+    <!-- Scenario Indicator -->
+    <div class="scenario-bar">
+        <span class="sc-dot" id="scDot"></span>
+        <span>Scenario:</span>
+        <span class="sc-num" id="scNum">0</span>
+        <span class="sc-label" id="scLabel">Not connected to scenario server</span>
+        <span class="sc-status disconnected" id="scStatus">Server Off</span>
+    </div>
+
+    <!-- Connection Panel -->
+    <div class="panel">
+        <div class="conn-panel">
+            <button id="connectBtn" onclick="connect()">Connect Serial</button>
+            <select id="baudRate">
+                <option value="9600" selected>9600</option>
+                <option value="19200">19200</option>
+                <option value="38400">38400</option>
+                <option value="57600">57600</option>
+                <option value="115200">115200</option>
+            </select>
+            <span class="status disconnected" id="connStatus">Disconnected</span>
+            <div class="slave-status">
+                <div class="slave-indicator"><span class="slave-dot s1" id="s1Dot"></span>S1_INV (0x11)</div>
+                <div class="slave-indicator"><span class="slave-dot s2" id="s2Dot"></span>S2_CH (0x21)</div>
+                <div class="slave-indicator"><span class="slave-dot s3" id="s3Dot"></span>S3_HMI (0x02)</div>
+            </div>
+            <div class="stats">
+                <div class="stat-item"><div class="value" id="txCount">0</div><div class="label">TX</div></div>
+                <div class="stat-item"><div class="value" id="rxCount">0</div><div class="label">RX</div></div>
+                <div class="stat-item"><div class="value" id="errCount">0</div><div class="label">Err</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs for different slaves -->
+    <div class="tab-container">
+        <div class="tab s1 active" onclick="showTab('s1')">S1_INV<span class="badge" id="s1Count">0</span></div>
+        <div class="tab s2" onclick="showTab('s2')">S2_CH<span class="badge" id="s2Count">0</span></div>
+        <div class="tab s3" onclick="showTab('s3')">S3_HMI<span class="badge" id="s3Count">0</span></div>
+        <div class="tab" onclick="showTab('log')">Log<span class="badge" id="logCount">0</span></div>
+        <div class="tab" onclick="showTab('datalog')" style="border-left: 3px solid #aa55ff;">Data Log<span class="badge" id="datalogCount">0</span></div>
+    </div>
+
+    <!-- S1_INV Panel -->
+    <div class="tab-content active" id="s1Content">
+        <div class="panel">
+            <div class="section-title">S1_INV (0x11) - Inverter Data @ Address 20100</div>
+            <div class="data-grid" id="s1ReadGrid"></div>
+        </div>
+        <div class="panel">
+            <div class="section-title">S1_INV Write Data</div>
+            <div class="data-grid" id="s1WriteGrid"></div>
+        </div>
+    </div>
+
+    <!-- S2_CH Panel -->
+    <div class="tab-content" id="s2Content">
+        <div class="panel">
+            <div class="section-title">S2_CH (0x21) - Charger Read Data</div>
+            <div class="data-grid" id="s2ReadGrid"></div>
+        </div>
+        <div class="panel">
+            <div class="section-title">S2_CH Write Data (Refs)</div>
+            <div class="data-grid" id="s2WriteGrid"></div>
+        </div>
+    </div>
+
+    <!-- S3_HMI Panel -->
+    <div class="tab-content" id="s3Content">
+        <div class="panel">
+            <div class="section-title">S3_HMI (0x02) - HMI Settings (READ @ 0-40)</div>
+            <div class="data-grid" id="s3ReadGrid"></div>
+        </div>
+        <div class="panel">
+            <div class="section-title">S3_HMI Status (WRITE @ 200-240)</div>
+            <div class="data-grid" id="s3WriteGrid"></div>
+        </div>
+        <div class="panel">
+            <div class="section-title">WEB REF Data (@ 901-929)</div>
+            <div class="data-grid" id="s3WebRefGrid"></div>
+        </div>
+    </div>
+
+    <!-- Log Panel -->
+    <div class="tab-content" id="logContent">
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="section-title" style="margin: 0; border: none;">Communication Log</span>
+                <div>
+                    <button class="filter-btn active" id="filterAll" onclick="setFilter('all')">All</button>
+                    <button class="filter-btn" id="filterS1" onclick="setFilter('s1')">S1</button>
+                    <button class="filter-btn" id="filterS2" onclick="setFilter('s2')">S2</button>
+                    <button class="filter-btn" id="filterS3" onclick="setFilter('s3')">S3</button>
+                    <button class="clear-btn" onclick="clearLog()">Clear</button>
+                </div>
+            </div>
+            <div class="log-panel" id="logPanel"></div>
+        </div>
+    </div>
+
+    <!-- Data Log Panel -->
+    <div class="tab-content" id="datalogContent">
+        <div class="panel">
+            <div class="log-controls">
+                <span class="rec-dot" id="recDot"></span>
+                <button class="start-log" id="startLogBtn" onclick="startDataLog()">Start Test</button>
+                <button class="stop-log" id="stopLogBtn" onclick="stopDataLog()" style="display:none;">Stop Test</button>
+                <button class="download-log" onclick="downloadDataLog()">Download CSV</button>
+                <button class="clear-btn" onclick="clearDataLog()">Clear</button>
+                <span class="rec-info" id="recInfo">Rows: 0</span>
+            </div>
+            <div class="data-log-table-wrap">
+                <table class="data-log-table">
+                    <thead id="datalogHead"></thead>
+                    <tbody id="datalogBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Slave IDs
+        const S1_INV_ID = 0x11;
+        const S2_CH_ID = 0x21;
+        const S3_HMI_ID = 0x02;
+
+        // S1_INV labels (Both READ and WRITE use int16 format, not floats!)
+        // First 3 are metadata: ID, LEN, SNAP - then actual sensor data starts
+        const S1_READ_LABELS = ['ID', 'LEN', 'SNAP', 'VDC', 'Iinv1', 'Iinv2', 'VO1', 'VO2', 'VG1', 'VG2', 'FRQI', 'FRQG', 'SSRS', 'FCODE', 'FTRIG', 'FFLAG', 'Temp1', 'Temp2', 'VbatFil', 'State'];
+        const S1_READ_UNITS = ['', '', '', 'V', 'A', 'A', 'V', 'V', 'V', 'V', 'Hz', 'Hz', '', '', '', '', 'C', 'C', 'V', ''];
+        // S1_INV READ data scales (from inverter firmware EnuMonitoringData)
+        const S1_READ_SCALES = [1, 1, 1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 1, 1, 1, 1, 10, 10, 10, 1];
+        // S1_INV WRITE data labels (int16 values with x0.1 scale for analog values)
+        const S1_WRITE_LABELS = [
+            'W0', 'W1', 'Iinv1', 'Iinv2', 'W4', 'W5', 'W6', 'VG1', 'VG2', 'VDC',
+            'VO1', 'VO2', 'FRQI', 'W13', 'W14', 'W15', 'W16', 'W17', 'W18', 'W19'
+        ];
+        const S1_WRITE_SCALE = 0.1;  // Scale factor for S1_INV write values
+
+        // S2_CH labels (floats)
+        const S2_READ_LABELS = ['VDC_CH', 'VBat_CH', 'IBat_CH', 'IBRI1C', 'IBRI2C', 'POWER1', 'GenS', 'State', 'FCC', 'REFID'];
+        const S2_READ_UNITS = ['V', 'V', 'A', 'A', 'A', 'W', '', '', '', ''];
+        const S2_WRITE_LABELS = ['Ref0', 'Ref1', 'Ref2', 'Ref3', 'Ref4', 'Ref5', 'Ref6', 'Ref7', 'Ref8', 'REFID'];
+
+        // S3_HMI labels (int16)
+        const S3_READ_LABELS = [
+            'IWEN', 'RR1', 'APREF', 'ROCHPREF', 'RPREF', 'RPUPLIMIT', 'RPLOWLIMIT', 'BFV', 'RR2', 'FUPLIMIT',
+            'FLOWLIMIT', 'AMPUPLIMIT', 'AMPLOWLIMIT', 'VDCSTART', 'VDCSTOP', 'VDCPTH', 'CUPTH', 'OVLTIME', 'OVLTH', 'BCHWEN',
+            'BCHONOFF', 'BCHUPLIMIT', 'BCHLOWLIMIT', 'RR4', 'USSR1', 'USSR2', 'URELAY1', 'URELAY2', 'URELAY3', 'URELAY4',
+            'TEMPEREF', 'TEMPH', 'CALIBT', 'TBREF', 'TBH', 'VBLOCK', 'TBLOCK'
+        ];
+        const S3_WRITE_LABELS = [
+            'LIVE', 'VDC', 'IINV1', 'IINV2', 'VO1', 'VO2', 'VG1', 'VG2', 'FRQI', 'FRQG',
+            'SSRS', 'FCODE', 'FTRIG', 'FFLAG', 'TEMP', 'R1', 'R2', 'R3', 'R4', 'R5',
+            'VDCC', 'VBC', 'IBC', 'IBRI1C', 'IBRI2C', 'POWER1', 'GENS', 'STATE', 'FCC', 'FFC',
+            'TEMPC', 'T2', 'INVCOMMAND', 'CHCOMMAND', 'INVLIVE', 'CHLIVE', 'TEMPE', 'HRELAY', 'BVTOTAL', 'BCTOTAL'
+        ];
+        const WEB_REF_START_ADDR = 901;
+        const WEB_REF_LABELS = [
+            {name: 'writeEn', scale: 10}, {name: 'sysMode', scale: 10}, {name: 'prefGc', scale: 10},
+            {name: 'wcPrefGC', scale: 10}, {name: 'qStar', scale: 10}, {name: 'qUpLimit', scale: 10},
+            {name: 'qLowLimit', scale: 10}, {name: 'vBat', scale: 10}, {name: 'Rst', scale: 10},
+            {name: 'R2', scale: 10}, {name: 'R3', scale: 10}, {name: 'vAmpUpLimit', scale: 10},
+            {name: 'vAmpLowLimit', scale: 10}, {name: 'vdcStart', scale: 10}, {name: 'vdcStop', scale: 10},
+            {name: 'vBattCh', scale: 10}, {name: 'I_Th', scale: 10}, {name: 'rmsOverTime', scale: 10},
+            {name: 'I_ThRms', scale: 10}, {name: 'LoadRlyCtrl', scale: 10}, {name: 'Server', scale: 10},
+            {name: 'modWriteEn', scale: 10}, {name: 'pwrOnUserCmd', scale: 10}, {name: 'lowBattLowTh', scale: 10},
+            {name: 'lowBattHiTh', scale: 10}, {name: 'powerLowCuttoff', scale: 10}, {name: 'lowBattFaultLowTh', scale: 10},
+            {name: 'lowBattFaultHiTh', scale: 10}, {name: 'REFID', scale: 1}
+        ];
+
+        // State
+        let port = null, reader = null, rxBuffer = [], isConnected = false;
+        let txCount = 0, rxCount = 0, errCount = 0;
+        let s1Count = 0, s2Count = 0, s3Count = 0, logCount = 0;
+        let lastByteTime = 0, frameTimer = null;
+        let currentFilter = 'all';
+        const FRAME_GAP_MS = 50;
+        let lastActivity = { s1: 0, s2: 0, s3: 0 };
+
+        // Initialize grids
+        function initGrids() {
+            // S1_INV
+            const s1Read = document.getElementById('s1ReadGrid');
+            S1_READ_LABELS.forEach((label, i) => {
+                s1Read.innerHTML += `<div class="data-item s1"><div class="label">${label}</div><div class="value" id="s1r${i}">--</div></div>`;
+            });
+            const s1Write = document.getElementById('s1WriteGrid');
+            for (let i = 0; i < 20; i++) {
+                const label = i < S1_WRITE_LABELS.length ? S1_WRITE_LABELS[i] : `W${i}`;
+                s1Write.innerHTML += `<div class="data-item s1"><div class="label">[${i}] ${label}</div><div class="value" id="s1w${i}">--</div></div>`;
+            }
+
+            // S2_CH
+            const s2Read = document.getElementById('s2ReadGrid');
+            S2_READ_LABELS.forEach((label, i) => {
+                s2Read.innerHTML += `<div class="data-item s2"><div class="label">${label}</div><div class="value" id="s2r${i}">--</div></div>`;
+            });
+            const s2Write = document.getElementById('s2WriteGrid');
+            S2_WRITE_LABELS.forEach((label, i) => {
+                s2Write.innerHTML += `<div class="data-item s2"><div class="label">${label}</div><div class="value" id="s2w${i}">--</div></div>`;
+            });
+
+            // S3_HMI
+            const s3Read = document.getElementById('s3ReadGrid');
+            S3_READ_LABELS.forEach((label, i) => {
+                s3Read.innerHTML += `<div class="data-item s3"><div class="label">[${i}] ${label}</div><div class="value" id="s3r${i}">--</div></div>`;
+            });
+            const s3Write = document.getElementById('s3WriteGrid');
+            S3_WRITE_LABELS.forEach((label, i) => {
+                s3Write.innerHTML += `<div class="data-item s3"><div class="label">[${200+i}] ${label}</div><div class="value" id="s3w${i}">--</div></div>`;
+            });
+            const s3WebRef = document.getElementById('s3WebRefGrid');
+            WEB_REF_LABELS.forEach((ref, i) => {
+                const label = ref.name === 'REFID' ? 'REFID' : `REF${i+1}`;
+                s3WebRef.innerHTML += `<div class="data-item web-ref"><div class="label">[${WEB_REF_START_ADDR+i}] ${label}</div><div class="value" id="s3wr${i}">--</div></div>`;
+            });
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.tab[onclick="showTab('${tab}')"]`).classList.add('active');
+            document.getElementById(tab + 'Content').classList.add('active');
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('filter' + filter.charAt(0).toUpperCase() + filter.slice(1)).classList.add('active');
+            updateLogVisibility();
+        }
+
+        function updateLogVisibility() {
+            document.querySelectorAll('.log-entry').forEach(entry => {
+                if (currentFilter === 'all') {
+                    entry.style.display = 'block';
+                } else {
+                    entry.style.display = entry.classList.contains(currentFilter) ? 'block' : 'none';
+                }
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('txCount').textContent = txCount;
+            document.getElementById('rxCount').textContent = rxCount;
+            document.getElementById('errCount').textContent = errCount;
+            document.getElementById('s1Count').textContent = s1Count;
+            document.getElementById('s2Count').textContent = s2Count;
+            document.getElementById('s3Count').textContent = s3Count;
+            document.getElementById('logCount').textContent = logCount;
+
+            // Update activity indicators
+            const now = Date.now();
+            ['s1', 's2', 's3'].forEach(s => {
+                const dot = document.getElementById(s + 'Dot');
+                dot.classList.toggle('active', now - lastActivity[s] < 2000);
+            });
+        }
+
+        function updateValue(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        // CRC-16 Modbus
+        function calculateCRC(data) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= data[i];
+                for (let j = 0; j < 8; j++) {
+                    crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : crc >> 1;
+                }
+            }
+            return crc;
+        }
+
+        function checkCRC(data) {
+            if (data.length < 4) return false;
+            const received = data[data.length - 2] | (data[data.length - 1] << 8);
+            return received === calculateCRC(data.slice(0, -2));
+        }
+
+        function toHex(data) {
+            return Array.from(data).map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+        }
+
+        // Float parsing for S1/S2 (big-endian)
+        function bytesToFloat(b0, b1, b2, b3) {
+            const buf = new ArrayBuffer(4);
+            const view = new DataView(buf);
+            view.setUint8(0, b0); view.setUint8(1, b1); view.setUint8(2, b2); view.setUint8(3, b3);
+            return view.getFloat32(0, false);
+        }
+
+        // Write float parsing (swapped bytes)
+        function parseWriteFloat(b0, b1, b2, b3) {
+            const buf = new ArrayBuffer(4);
+            const view = new DataView(buf);
+            view.setUint8(0, b2); view.setUint8(1, b3); view.setUint8(2, b0); view.setUint8(3, b1);
+            return view.getFloat32(0, false);
+        }
+
+        function addLog(slaveClass, direction, data, parsed) {
+            const log = document.getElementById('logPanel');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+            const slaveName = slaveClass === 's1' ? 'S1_INV' : slaveClass === 's2' ? 'S2_CH' : slaveClass === 's3' ? 'S3_HMI' : 'UNK';
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${direction} ${slaveClass}`;
+            entry.innerHTML = `<span class="log-time">[${time}]</span><span class="log-slave ${slaveClass}">${slaveName}</span><span class="log-hex">${toHex(data)}</span>\n<span class="log-parsed">${parsed}</span>`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            if (currentFilter !== 'all' && !entry.classList.contains(currentFilter)) {
+                entry.style.display = 'none';
+            }
+            logCount++;
+            while (log.children.length > 500) log.removeChild(log.firstChild);
+        }
+
+        function clearLog() {
+            document.getElementById('logPanel').innerHTML = '';
+            logCount = 0;
+            updateStats();
+        }
+
+        function getSlaveClass(id) {
+            if (id === S1_INV_ID) return 's1';
+            if (id === S2_CH_ID) return 's2';
+            if (id === S3_HMI_ID) return 's3';
+            return 'unknown';
+        }
+
+        function getExpectedFrameLength(buffer) {
+            if (buffer.length < 3) return 0;
+            const fc = buffer[1];
+
+            if (fc === 0x03) {
+                // First check if it's an 8-byte READ REQUEST (check CRC first)
+                if (buffer.length >= 8 && checkCRC(buffer.slice(0, 8))) {
+                    return 8;
+                }
+                // Otherwise check for READ RESPONSE with byte count at position 2
+                if (buffer.length >= 5) {
+                    const bc = buffer[2];
+                    if (bc >= 4 && bc <= 250) {
+                        const expLen = 3 + bc + 2;
+                        // Wait for full frame
+                        if (buffer.length < expLen) return 0;
+                        if (checkCRC(buffer.slice(0, expLen))) return expLen;
+                    }
+                }
+                // Default to waiting for 8-byte request if not enough data
+                return buffer.length < 8 ? 0 : 8;
+            } else if (fc === 0x10) {
+                // For WRITE (0x10), first try to detect WRITE REQUEST (longer frame)
+                if (buffer.length >= 7) {
+                    const bc = buffer[6];
+                    // Check if this looks like a byte count (must be even, > 0)
+                    if (bc > 0 && bc <= 250 && (bc % 2) === 0) {
+                        // Try to find valid CRC starting from minimum possible length
+                        for (let tryLen = 9; tryLen <= buffer.length; tryLen++) {
+                            if (checkCRC(buffer.slice(0, tryLen))) return tryLen;
+                        }
+                        // If no valid CRC found yet, wait for more data
+                        const expLen = 7 + bc + 2;
+                        if (buffer.length < expLen) return 0;  // Wait for more
+                    }
+                }
+                // Check for 8-byte WRITE RESPONSE
+                if (buffer.length >= 8 && checkCRC(buffer.slice(0, 8))) return 8;
+                return 0;
+            }
+            return 8;
+        }
+
+        function processS1Frame(data, fc) {
+            let parsed = '', dir = 'rx';
+            if (fc === 0x03) {
+                if (data.length === 8) {
+                    const addr = (data[2] << 8) | data[3];
+                    const count = (data[4] << 8) | data[5];
+                    dir = 'tx'; txCount++;
+                    parsed = `READ REQ: Addr=${addr}, Count=${count} regs`;
+                } else {
+                    const bc = data[2];
+                    const regCount = bc / 2;  // S1_INV READ uses int16 (2 bytes per register)
+                    rxCount++;
+                    parsed = `READ RSP: ${regCount} int16 values`;
+                    for (let i = 0; i < regCount && i < S1_READ_LABELS.length; i++) {
+                        const idx = 3 + i * 2;
+                        if (idx + 1 < data.length - 2) {
+                            // Parse as signed int16 (big-endian)
+                            let val = (data[idx] << 8) | data[idx + 1];
+                            if (val > 32767) val -= 65536;  // Convert to signed
+
+                            const scale = S1_READ_SCALES[i] || 1;
+                            const scaled = val / scale;  // Divide by scale (inverter multiplies, we divide)
+
+                            // Check for invalid data markers (0x8000) only for temperature sensors
+                            // Temperature below -100°C is physically impossible, so mark as invalid
+                            let displayVal;
+                            const isTemperatureSensor = S1_READ_UNITS[i] === 'C';
+                            if (val === -32768 && isTemperatureSensor) {
+                                displayVal = '--';
+                                parsed += `\n  ${S1_READ_LABELS[i]}: N/A (not ready)`;
+                            } else {
+                                displayVal = scaled.toFixed(2);
+                                parsed += `\n  ${S1_READ_LABELS[i]}: ${displayVal} ${S1_READ_UNITS[i]}`;
+                            }
+                            updateValue(`s1r${i}`, displayVal);
+                        }
+                    }
+                }
+            } else if (fc === 0x10) {
+                if (data.length === 8) {
+                    rxCount++;
+                    parsed = `WRITE RSP: OK`;
+                } else {
+                    const addr = (data[2] << 8) | data[3];
+                    const bc = data[6];
+                    // Calculate actual data bytes available (frame - header - CRC)
+                    const actualDataBytes = data.length - 7 - 2;
+                    // Use actual data available, not bc (firmware sends wrong bc)
+                    const actualRegCount = Math.floor(actualDataBytes / 2);
+                    dir = 'tx'; txCount++;
+                    parsed = `WRITE REQ: Addr=${addr}, ${actualRegCount} int16 values (bc=${bc})`;
+                    for (let i = 0; i < actualRegCount && i < 20; i++) {
+                        const idx = 7 + i * 2;
+                        // Parse as signed int16 (big-endian)
+                        let val = (data[idx] << 8) | data[idx + 1];
+                        if (val > 32767) val -= 65536;  // Convert to signed
+                        const scaled = val * S1_WRITE_SCALE;
+                        const label = i < S1_WRITE_LABELS.length ? S1_WRITE_LABELS[i] : `W${i}`;
+                        parsed += `\n  [${i}] ${label}: ${scaled.toFixed(1)}`;
+                        updateValue(`s1w${i}`, scaled.toFixed(1));
+                    }
+                }
+            }
+            s1Count++;
+            lastActivity.s1 = Date.now();
+            addLog('s1', dir, data, parsed);
+        }
+
+        function processS2Frame(data, fc) {
+            let parsed = '', dir = 'rx';
+            if (fc === 0x03) {
+                if (data.length === 8) {
+                    const addr = (data[2] << 8) | data[3];
+                    const count = (data[4] << 8) | data[5];
+                    dir = 'tx'; txCount++;
+                    parsed = `READ REQ: Addr=${addr}, Count=${count} regs`;
+                } else {
+                    const bc = data[2];
+                    rxCount++;
+                    parsed = `READ RSP: ${bc/4} floats`;
+                    for (let i = 0; i < bc/4 && i < S2_READ_LABELS.length; i++) {
+                        const idx = 3 + i*4;
+                        if (idx + 3 < data.length - 2) {
+                            const f = bytesToFloat(data[idx], data[idx+1], data[idx+2], data[idx+3]);
+                            parsed += `\n  ${S2_READ_LABELS[i]}: ${f.toFixed(2)} ${S2_READ_UNITS[i]}`;
+                            updateValue(`s2r${i}`, f.toFixed(2));
+                        }
+                    }
+                }
+            } else if (fc === 0x10) {
+                if (data.length === 8) {
+                    rxCount++;
+                    parsed = `WRITE RSP: OK`;
+                } else {
+                    const addr = (data[2] << 8) | data[3];
+                    const bc = data[6];
+                    dir = 'tx'; txCount++;
+                    parsed = `WRITE REQ: Addr=${addr}, ${bc/4} floats`;
+                    for (let i = 0; i < bc/4 && i < S2_WRITE_LABELS.length; i++) {
+                        const idx = 7 + i*4;
+                        if (idx + 3 < data.length - 2) {
+                            const f = parseWriteFloat(data[idx], data[idx+1], data[idx+2], data[idx+3]);
+                            parsed += `\n  ${S2_WRITE_LABELS[i]}: ${f.toFixed(2)}`;
+                            updateValue(`s2w${i}`, f.toFixed(2));
+                        }
+                    }
+                }
+            }
+            s2Count++;
+            lastActivity.s2 = Date.now();
+            addLog('s2', dir, data, parsed);
+        }
+
+        function processS3Frame(data, fc) {
+            let parsed = '', dir = 'rx';
+            if (fc === 0x03) {
+                if (data.length === 8) {
+                    const addr = (data[2] << 8) | data[3];
+                    const count = (data[4] << 8) | data[5];
+                    dir = 'tx'; txCount++;
+                    parsed = `READ REQ: Addr=${addr}, Count=${count} regs`;
+                } else {
+                    const bc = data[2];
+                    rxCount++;
+                    parsed = `READ RSP: ${bc/2} regs (HMI settings)`;
+                    for (let i = 0; i < bc/2 && i < S3_READ_LABELS.length; i++) {
+                        const idx = 3 + i*2;
+                        let val = (data[idx] << 8) | data[idx+1];
+                        if (val > 32767) val -= 65536;
+                        parsed += `\n  [${i}] ${S3_READ_LABELS[i]}: ${val}`;
+                        updateValue(`s3r${i}`, val);
+                    }
+                }
+            } else if (fc === 0x10) {
+                if (data.length === 8) {
+                    const addr = (data[2] << 8) | data[3];
+                    rxCount++;
+                    parsed = `WRITE RSP: Addr=${addr} OK`;
+                } else {
+                    const addr = (data[2] << 8) | data[3];
+                    const regCount = (data[4] << 8) | data[5];
+                    dir = 'tx'; txCount++;
+
+                    if (addr >= WEB_REF_START_ADDR) {
+                        parsed = `WRITE REQ: WEB REF @ ${addr}, ${regCount} regs`;
+                        for (let i = 0; i < regCount; i++) {
+                            const idx = 7 + i*2;
+                            if (idx + 1 < data.length - 2) {
+                                let val = (data[idx] << 8) | data[idx+1];
+                                if (val > 32767) val -= 65536;
+                                const refIdx = addr - WEB_REF_START_ADDR + i;
+                                if (refIdx >= 0 && refIdx < WEB_REF_LABELS.length) {
+                                    const ref = WEB_REF_LABELS[refIdx];
+                                    const scaled = val / ref.scale;
+                                    parsed += `\n  [${addr+i}] ${ref.name}: ${scaled.toFixed(1)}`;
+                                    updateValue(`s3wr${refIdx}`, scaled.toFixed(1));
+                                }
+                            }
+                        }
+                    } else {
+                        parsed = `WRITE REQ: SMU status @ ${addr}, ${regCount} regs`;
+                        for (let i = 0; i < regCount; i++) {
+                            const idx = 7 + i*2;
+                            if (idx + 1 < data.length - 2) {
+                                let val = (data[idx] << 8) | data[idx+1];
+                                if (val > 32767) val -= 65536;
+                                const wIdx = addr - 200 + i;
+                                if (wIdx >= 0 && wIdx < S3_WRITE_LABELS.length) {
+                                    parsed += `\n  [${addr+i}] ${S3_WRITE_LABELS[wIdx]}: ${val}`;
+                                    updateValue(`s3w${wIdx}`, val);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            s3Count++;
+            lastActivity.s3 = Date.now();
+            addLog('s3', dir, data, parsed);
+        }
+
+        function processCompleteFrame(data) {
+            if (data.length < 4) return;
+
+            const slaveId = data[0];
+            const slaveClass = getSlaveClass(slaveId);
+
+            if (!checkCRC(data)) {
+                errCount++;
+                addLog(slaveClass, 'error', data, `CRC ERROR (len=${data.length})`);
+                updateStats();
+                return;
+            }
+
+            const fc = data[1];
+
+            if (slaveId === S1_INV_ID) {
+                processS1Frame(data, fc);
+            } else if (slaveId === S2_CH_ID) {
+                processS2Frame(data, fc);
+            } else if (slaveId === S3_HMI_ID) {
+                processS3Frame(data, fc);
+            } else {
+                addLog('unknown', 'rx', data, `Unknown slave ID=0x${slaveId.toString(16).toUpperCase()}`);
+            }
+
+            updateStats();
+        }
+
+        function startFrameTimer() {
+            frameTimer = setInterval(() => {
+                if (rxBuffer.length < 2) return;
+                const expLen = getExpectedFrameLength(rxBuffer);
+                const elapsed = performance.now() - lastByteTime;
+
+                if (expLen > 0 && rxBuffer.length >= expLen) {
+                    const frame = rxBuffer.splice(0, expLen);
+                    processCompleteFrame(frame);
+                } else if (elapsed > FRAME_GAP_MS && rxBuffer.length > 0) {
+                    processCompleteFrame(rxBuffer.slice());
+                    rxBuffer = [];
+                }
+            }, 2);
+        }
+
+        function stopFrameTimer() {
+            if (frameTimer) { clearInterval(frameTimer); frameTimer = null; }
+        }
+
+        async function readLoop() {
+            while (isConnected && port && port.readable) {
+                try {
+                    reader = port.readable.getReader();
+                    while (isConnected) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        for (const byte of value) rxBuffer.push(byte);
+                        lastByteTime = performance.now();
+                        if (rxBuffer.length > 500) rxBuffer = [];
+                    }
+                } catch (e) {
+                    if (isConnected) console.error('Read error:', e);
+                } finally {
+                    if (reader) { try { reader.releaseLock(); } catch(e){} reader = null; }
+                }
+            }
+        }
+
+        async function disconnect() {
+            isConnected = false;
+            stopFrameTimer();
+            try { if (reader) await reader.cancel().catch(()=>{}); reader = null; } catch(e){}
+            try { if (port) await port.close().catch(()=>{}); port = null; } catch(e){}
+            document.getElementById('connectBtn').textContent = 'Connect Serial';
+            document.getElementById('connectBtn').classList.remove('disconnect');
+            document.getElementById('connStatus').textContent = 'Disconnected';
+            document.getElementById('connStatus').className = 'status disconnected';
+        }
+
+        async function connect() {
+            if (isConnected) { await disconnect(); return; }
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: parseInt(document.getElementById('baudRate').value) });
+                isConnected = true;
+                document.getElementById('connectBtn').textContent = 'Disconnect';
+                document.getElementById('connectBtn').classList.add('disconnect');
+                document.getElementById('connStatus').textContent = 'Connected';
+                document.getElementById('connStatus').className = 'status connected';
+                rxBuffer = [];
+                lastByteTime = performance.now();
+                startFrameTimer();
+                readLoop();
+            } catch (e) {
+                console.error('Connection error:', e);
+                alert('Failed to connect: ' + e.message);
+                await disconnect();
+            }
+        }
+
+        // Activity indicator update
+        setInterval(updateStats, 500);
+
+        // Initialize
+        initGrids();
+        if (!('serial' in navigator)) {
+            alert('Web Serial API not supported. Please use Chrome/Edge browser.');
+        }
+
+        // --- Data Log ---
+        let dataLogRows = [];
+        let dataLogTimer = null;
+        let dataLogRecording = false;
+        let dataLogStartTime = 0;
+        const DATALOG_SKIP = new Set(['LIVE', 'R1', 'R2', 'R3', 'R4', 'R5', 'TEMPC', 'T2', 'INVLIVE', 'CHLIVE', 'TEMPE']);
+        const DATALOG_NO_SCALE = new Set(['SSRS', 'FCODE', 'FTRIG', 'FFLAG', 'STATE', 'FCC', 'FFC', 'INVCOMMAND', 'CHCOMMAND', 'HRELAY', 'GENS']);
+        const DATALOG_S3_INDICES = S3_WRITE_LABELS.map((l, i) => i).filter(i => !DATALOG_SKIP.has(S3_WRITE_LABELS[i]));
+        const DATALOG_COLUMNS = ['Time(s)', 'Scenario', ...DATALOG_S3_INDICES.map(i => S3_WRITE_LABELS[i])];
+
+        function initDataLogTable() {
+            const head = document.getElementById('datalogHead');
+            head.innerHTML = '<tr>' + DATALOG_COLUMNS.map(c => `<th>${c}</th>`).join('') + '</tr>';
+        }
+
+        function captureDataLogRow() {
+            const elapsed = ((Date.now() - dataLogStartTime) / 1000).toFixed(1);
+            const scNum = document.getElementById('scNum').textContent || '0';
+
+            const vals = [elapsed, scNum];
+            for (const i of DATALOG_S3_INDICES) {
+                const el = document.getElementById('s3w' + i);
+                const raw = el ? el.textContent : '--';
+                if (raw === '--') { vals.push('--'); }
+                else if (DATALOG_NO_SCALE.has(S3_WRITE_LABELS[i])) { vals.push(raw); }
+                else { vals.push((parseFloat(raw) / 10).toFixed(1)); }
+            }
+            dataLogRows.push(vals);
+
+            // Add row to table
+            const tbody = document.getElementById('datalogBody');
+            const tr = document.createElement('tr');
+            vals.forEach((v, idx) => {
+                const td = document.createElement('td');
+                td.textContent = v;
+                if (idx === 1) td.className = 'sc-col';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+            // Auto-scroll
+            const wrap = tbody.closest('.data-log-table-wrap');
+            wrap.scrollTop = wrap.scrollHeight;
+
+            document.getElementById('recInfo').textContent = `Rows: ${dataLogRows.length}`;
+            document.getElementById('datalogCount').textContent = dataLogRows.length;
+        }
+
+        function startDataLog() {
+            if (dataLogRecording) return;
+            // Clear previous data
+            dataLogRows = [];
+            document.getElementById('datalogBody').innerHTML = '';
+            document.getElementById('recInfo').textContent = 'Rows: 0';
+            document.getElementById('datalogCount').textContent = '0';
+            // Tell Python server to start scenarios
+            fetch('/start', { method: 'POST' }).catch(() => {});
+            dataLogStartTime = Date.now();
+            dataLogRecording = true;
+            document.getElementById('recDot').classList.add('recording');
+            document.getElementById('startLogBtn').style.display = 'none';
+            document.getElementById('stopLogBtn').style.display = '';
+            captureDataLogRow();
+            dataLogTimer = setInterval(captureDataLogRow, 1000);
+        }
+
+        function stopDataLog() {
+            if (!dataLogRecording) return;
+            // Tell Python server to stop scenarios
+            fetch('/stop', { method: 'POST' }).catch(() => {});
+            dataLogRecording = false;
+            if (dataLogTimer) { clearInterval(dataLogTimer); dataLogTimer = null; }
+            document.getElementById('recDot').classList.remove('recording');
+            document.getElementById('startLogBtn').style.display = '';
+            document.getElementById('stopLogBtn').style.display = 'none';
+            // Auto-save CSV
+            if (dataLogRows.length > 0) downloadDataLog();
+        }
+
+        function clearDataLog() {
+            stopDataLog();
+            dataLogRows = [];
+            document.getElementById('datalogBody').innerHTML = '';
+            document.getElementById('recInfo').textContent = 'Rows: 0';
+            document.getElementById('datalogCount').textContent = '0';
+        }
+
+        function downloadDataLog() {
+            if (dataLogRows.length === 0) { alert('No data to download.'); return; }
+            const csv = [DATALOG_COLUMNS.join(','), ...dataLogRows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const now = new Date();
+            const p = (n, d=2) => String(n).padStart(d, '0');
+            const ts = `${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}_${p(now.getHours())}-${p(now.getMinutes())}-${p(now.getSeconds())}`;
+            a.download = `HMI_DataLog_${ts}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        initDataLogTable();
+
+        // --- Scenario Server (SSE) ---
+        function connectScenarioServer() {
+            const evtSource = new EventSource('/events');
+            evtSource.onopen = () => {
+                document.getElementById('scStatus').textContent = 'Server On';
+                document.getElementById('scStatus').className = 'sc-status connected';
+            };
+            evtSource.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                document.getElementById('scNum').textContent = data.scenario || '0';
+                document.getElementById('scLabel').textContent = data.label || '';
+                const dot = document.getElementById('scDot');
+                dot.classList.toggle('active', data.scenario > 0);
+
+                // Auto-stop logging when scenarios finish or are stopped
+                if (data.running === false && dataLogRecording) {
+                    dataLogRecording = false;
+                    if (dataLogTimer) { clearInterval(dataLogTimer); dataLogTimer = null; }
+                    document.getElementById('recDot').classList.remove('recording');
+                    document.getElementById('startLogBtn').style.display = '';
+                    document.getElementById('stopLogBtn').style.display = 'none';
+                    // Auto-save CSV
+                    if (dataLogRows.length > 0) downloadDataLog();
+                }
+
+                // Add marker to log
+                if (data.scenario > 0) {
+                    const log = document.getElementById('logPanel');
+                    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+                    const marker = document.createElement('div');
+                    marker.className = 'log-entry';
+                    marker.style.background = '#2a1a4a';
+                    marker.style.borderLeft = '3px solid #aa55ff';
+                    marker.innerHTML = `<span class="log-time">[${time}]</span> <b style="color:#aa55ff">SCENARIO #${data.scenario}: ${data.label}</b>`;
+                    log.appendChild(marker);
+                    log.scrollTop = log.scrollHeight;
+                }
+            };
+            evtSource.onerror = () => {
+                document.getElementById('scStatus').textContent = 'Server Off';
+                document.getElementById('scStatus').className = 'sc-status disconnected';
+                document.getElementById('scNum').textContent = '0';
+                document.getElementById('scLabel').textContent = 'Reconnecting...';
+                document.getElementById('scDot').classList.remove('active');
+            };
+        }
+        connectScenarioServer();
+    </script>
+</body>
+</html>
