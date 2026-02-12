@@ -11,8 +11,8 @@ This tool sniffs Modbus RTU traffic on the serial bus between three slaves (S1_I
 1. Double-click **`START_SMU_Sniffer.bat`**
 2. Browser opens automatically at `http://localhost:8765`
 3. Click **Connect Serial** and select the Modbus RTU COM port
-4. Go to the **Data Log** tab
-5. Click **Start Test** to begin scenario sequencing and data recording
+4. Run `pytest SystemLevel_Scenarios.py` from Typhoon HIL IDE console
+5. Data logging starts automatically when first scenario arrives
 6. CSV is saved automatically when all scenarios complete (use **Download CSV** for manual saves)
 
 ## Requirements
@@ -27,9 +27,10 @@ No other software or Python packages need to be installed.
 | File | Description |
 |------|-------------|
 | `START_SMU_Sniffer.bat` | One-click launcher - finds Typhoon Python, starts server, opens browser |
-| `scenario_server.py` | Python HTTP server - serves HTML, launches pytest, relays scenario updates via SSE |
-| `Modbus_Bus_Sniffer.html` | Browser UI - Modbus sniffer, live register display, data logging |
-| `SystemLevel_Scenarios.py` | Typhoon HIL pytest test suite - executed by the server, reports scenarios back via HTTP |
+| `scenario_server.py` | Python HTTP server - serves HTML, relays scenario updates and console output via SSE |
+| `Modbus_Bus_Sniffer.html` | Browser UI - Modbus sniffer, live register display, data logging, console output |
+| `SystemLevel_Scenarios.py` | Typhoon HIL pytest test suite - reports scenarios to server via HTTP POST |
+| `conftest.py` | pytest plugin - captures console output to `pytest_console.log` for browser streaming |
 | `run_server.ps1` | PowerShell helper to run the server manually |
 
 ## Features
@@ -45,6 +46,7 @@ No other software or Python packages need to be installed.
 - Analog values (VDC, IINV1, IINV2, VO1, VO2, VG1, VG2, FRQI, FRQG, etc.) are scaled by /10
 - Status registers (SSRS, FCODE, STATE, INVCOMMAND, etc.) logged as raw integers
 - Relative time in seconds from test start
+- Auto-starts when first scenario arrives (manual **Start Log**/**Stop Log** buttons also available)
 - Auto-saves CSV when all scenarios complete naturally
 - Manual download available via **Download CSV** button
 - CSV filename includes date/time: `HMI_DataLog_2026-02-10_22-15-30.csv`
@@ -57,27 +59,35 @@ No other software or Python packages need to be installed.
   - GridConnection_PhaseLoad (16 scenarios)
   - GC_currentlimit (4 scenarios)
   - Startup_GC_Bat_first (10 scenarios)
-- **Start Test** launches `pytest SystemLevel_Scenarios.py` as a subprocess
+- Run `pytest SystemLevel_Scenarios.py` from Typhoon HIL IDE console
 - Each test function reports its scenario to the server via HTTP POST
-- **Stop Test** terminates the pytest subprocess
 - Live scenario indicator bar shows current scenario number and name
-- Tests also work standalone (`pytest SystemLevel_Scenarios.py`) without the server
+- Tests also work standalone without the server (scenario reporting will silently fail)
+
+### Console Output
+- Real-time display of pytest console output in the browser
+- Shows test progress, errors, and all pytest output
+- Automatically captured via `conftest.py` plugin
+- Output appears in both Typhoon IDE console and browser Console tab
 
 ## Architecture
 
 ```
-Browser (Chrome/Edge)          Python Server (localhost:8765)        pytest subprocess
+Browser (Chrome/Edge)          Python Server (localhost:8765)        Typhoon HIL IDE
 +-----------------------+      +-------------------------+      +-------------------------+
-| Modbus Sniffer (HTML) |      | scenario_server.py      |      | SystemLevel_Scenarios.py |
+| Modbus Sniffer (HTML) |      | scenario_server.py      |      | pytest console          |
 |                       |      |                         |      |                         |
-| Web Serial API -----> |      |  GET /        -> HTML   |      | test_SA_CurrentLimit_*  |
-|   (COM port sniff)    |      |  GET /events  -> SSE    |      | test_GridConnection_*   |
-|                       | SSE  |  POST /start  -> pytest |----->| test_GC_currentLimit    |
-| EventSource <---------|------|  POST /stop   -> kill   |      | test_Startup1           |
-|                       |      |  POST /scenario <- recv |<-----|  report_scenario(label) |
-| Start Test  --------->|------|                         |      |                         |
-| Stop Test   --------->|------|  monitor subprocess     |      | Typhoon HIL hardware    |
-+-----------------------+      +-------------------------+      +-------------------------+
+| Web Serial API -----> |      |  GET /         -> HTML  |      | > pytest SystemLevel... |
+|   (COM port sniff)    |      |  GET /events   -> SSE   |      |                         |
+|                       | SSE  |  GET /console  -> SSE   |      | SystemLevel_Scenarios   |
+| Scenario SSE <--------|------|  POST /scenario <- recv |<-----| + conftest.py           |
+| Console SSE  <--------|------|                         |      |   report_scenario()     |
+|                       |      |  monitor_console_log()  |      |   write console log     |
+| Start/Stop Log        |      |    (file watcher)       |<-----| pytest_console.log      |
+| (local only)          |      +-------------------------+      +-------------------------+
++-----------------------+                                                   |
+                                                                           v
+                                                              Typhoon HIL Hardware
 ```
 
 ## Modbus Slave Addresses

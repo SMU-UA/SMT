@@ -147,6 +147,7 @@
         <div class="tab s3" onclick="showTab('s3')">S3_HMI<span class="badge" id="s3Count">0</span></div>
         <div class="tab" onclick="showTab('log')">Log<span class="badge" id="logCount">0</span></div>
         <div class="tab" onclick="showTab('datalog')" style="border-left: 3px solid #aa55ff;">Data Log<span class="badge" id="datalogCount">0</span></div>
+        <div class="tab" onclick="showTab('console')" style="border-left: 2px solid #22d3ee;">Console</div>
     </div>
 
     <!-- S1_INV Panel -->
@@ -211,8 +212,8 @@
         <div class="panel">
             <div class="log-controls">
                 <span class="rec-dot" id="recDot"></span>
-                <button class="start-log" id="startLogBtn" onclick="startDataLog()">Start Test</button>
-                <button class="stop-log" id="stopLogBtn" onclick="stopDataLog()" style="display:none;">Stop Test</button>
+                <button class="start-log" id="startLogBtn" onclick="startDataLog()">Start Log</button>
+                <button class="stop-log" id="stopLogBtn" onclick="stopDataLog()" style="display:none;">Stop Log</button>
                 <button class="download-log" onclick="downloadDataLog()">Download CSV</button>
                 <button class="clear-btn" onclick="clearDataLog()">Clear</button>
                 <span class="rec-info" id="recInfo">Rows: 0</span>
@@ -223,6 +224,17 @@
                     <tbody id="datalogBody"></tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Console Panel -->
+    <div class="tab-content" id="consoleContent">
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="section-title" style="margin: 0; border: none;">Pytest Console Output</span>
+                <button class="clear-btn" onclick="clearConsole()">Clear</button>
+            </div>
+            <div id="consolePanel" style="background: #0a0e1a; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; padding: 10px; height: calc(100vh - 250px); overflow-y: auto; border: 1px solid #1e293b; border-radius: 4px; color: #94a3b8;"></div>
         </div>
     </div>
 
@@ -827,9 +839,7 @@
             document.getElementById('datalogCount').textContent = '0';
             // Reset scenario display
             document.getElementById('scNum').textContent = '0';
-            document.getElementById('scLabel').textContent = 'Starting...';
-            // Tell server to launch pytest
-            fetch('/start', { method: 'POST' }).catch(() => {});
+            document.getElementById('scLabel').textContent = 'Logging...';
             dataLogStartTime = Date.now();
             dataLogRecording = true;
             dataLogSeenRunning = false;
@@ -842,8 +852,6 @@
 
         function stopDataLog() {
             if (!dataLogRecording) return;
-            // Tell Python server to stop scenarios
-            fetch('/stop', { method: 'POST' }).catch(() => {});
             document.getElementById('scNum').textContent = '0';
             document.getElementById('scLabel').textContent = 'Stopped';
             document.getElementById('scDot').classList.remove('active');
@@ -889,6 +897,11 @@
             evtSource.onmessage = (e) => {
                 const data = JSON.parse(e.data);
 
+                // Auto-start logging when first scenario arrives
+                if (data.scenario > 0 && !dataLogRecording) {
+                    startDataLog();
+                }
+
                 // Only update scenario display when test is running
                 if (dataLogRecording) {
                     if (data.running === true) dataLogSeenRunning = true;
@@ -898,7 +911,7 @@
                     dot.classList.toggle('active', data.scenario > 0);
                 }
 
-                // Update label when scenarios finish (recording continues until manual Stop Test)
+                // Update label when scenarios finish (recording continues until manual Stop Log)
                 if (data.running === false && dataLogRecording && dataLogSeenRunning) {
                     document.getElementById('scLabel').textContent = 'Test complete';
                     document.getElementById('scDot').classList.remove('active');
@@ -926,6 +939,28 @@
             };
         }
         connectScenarioServer();
+
+        // --- Console Stream (SSE) ---
+        function connectConsole() {
+            const consoleSource = new EventSource('/console');
+            consoleSource.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                const consolePanel = document.getElementById('consolePanel');
+                const line = document.createElement('div');
+                line.textContent = data.line;
+                line.style.marginBottom = '2px';
+                consolePanel.appendChild(line);
+                consolePanel.scrollTop = consolePanel.scrollHeight;
+            };
+            consoleSource.onerror = () => {
+                console.error('Console stream disconnected');
+            };
+        }
+        connectConsole();
+
+        function clearConsole() {
+            document.getElementById('consolePanel').innerHTML = '';
+        }
     </script>
 </body>
 </html>

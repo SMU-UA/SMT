@@ -6,47 +6,28 @@ Usage:
     "C:\\Program Files\\Typhoon HIL Control Center 2025.4\\python3_portable\\python.exe" scenario_server.py
 
     Then open http://localhost:8765 in Chrome/Edge.
-    Press "Start Test" to launch pytest and begin scenarios.
-    Press "Stop Test" to terminate the test run.
+
+    Run pytest SystemLevel_Scenarios.py separately to execute tests.
+    The server will receive and broadcast scenario updates.
 """
 
 import http.server
 import json
 import os
-import subprocess
-import sys
 import threading
 import time
 
 PORT = 8765
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HTML_FILE = os.path.join(SCRIPT_DIR, "Modbus_Bus_Sniffer.html")
-TEST_FILE = os.path.join(SCRIPT_DIR, "SystemLevel_Scenarios.py")
+CONSOLE_LOG = os.path.join(SCRIPT_DIR, "pytest_console.log")
 
-current_scenario = {"scenario": 0, "label": "Waiting for Start Test...", "running": False}
+current_scenario = {"scenario": 0, "label": "Ready - Run pytest to start", "running": False}
 sse_clients = []
 lock = threading.Lock()
 
-# Pytest subprocess management
-pytest_process = None
-pytest_lock = threading.Lock()
-_user_stopped = threading.Event()
-
-
-def _kill_pytest():
-    """Terminate the pytest subprocess if it is running."""
-    global pytest_process
-    with pytest_lock:
-        if pytest_process is not None:
-            try:
-                pytest_process.terminate()
-                pytest_process.wait(timeout=5)
-            except Exception:
-                try:
-                    pytest_process.kill()
-                except Exception:
-                    pass
-            pytest_process = None
+console_clients = []
+console_lock = threading.Lock()
 
 
 def broadcast(scenario_num, label, running=True):
@@ -65,39 +46,36 @@ def broadcast(scenario_num, label, running=True):
             sse_clients.remove(d)
 
 
-def monitor_pytest():
-    """Wait for the pytest subprocess to exit and broadcast the result."""
-    global pytest_process
-    with pytest_lock:
-        proc = pytest_process
-    if proc is None:
-        return
+def broadcast_console(line):
+    """Broadcast a console line to all console SSE clients."""
+    msg = f"data: {json.dumps({'line': line})}\n\n".encode()
+    with console_lock:
+        dead = []
+        for client in console_clients:
+            try:
+                client.write(msg)
+                client.flush()
+            except:
+                dead.append(client)
+        for d in dead:
+            console_clients.remove(d)
 
-    # Read stdout to prevent pipe buffer deadlock
-    try:
-        for line in proc.stdout:
-            decoded = line.decode("utf-8", errors="replace").rstrip()
-            if decoded:
-                print(f"  [pytest] {decoded}")
-    except Exception:
-        pass
 
-    exit_code = proc.wait()
-
-    with pytest_lock:
-        if pytest_process is proc:
-            pytest_process = None
-
-    # If user already stopped, don't broadcast again
-    if _user_stopped.is_set():
-        return
-
-    if exit_code == 0:
-        broadcast(0, "All tests complete", running=False)
-        print("  >> All tests complete")
-    else:
-        broadcast(0, f"Tests finished (exit code {exit_code})", running=False)
-        print(f"  >> Tests finished with exit code {exit_code}")
+def monitor_console_log():
+    """Monitor pytest_console.log and broadcast new lines."""
+    file_pos = 0
+    while True:
+        try:
+            if os.path.exists(CONSOLE_LOG):
+                with open(CONSOLE_LOG, 'r', encoding='utf-8', errors='replace') as f:
+                    f.seek(file_pos)
+                    new_lines = f.readlines()
+                    file_pos = f.tell()
+                    for line in new_lines:
+                        broadcast_console(line.rstrip())
+        except Exception as e:
+            pass
+        time.sleep(0.5)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -143,48 +121,31 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(current_scenario).encode())
 
+        elif self.path == "/console":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+
+            with console_lock:
+                console_clients.append(self.wfile)
+
+            try:
+                while True:
+                    time.sleep(1)
+            except:
+                pass
+            finally:
+                with console_lock:
+                    if self.wfile in console_clients:
+                        console_clients.remove(self.wfile)
+
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
-        if self.path == "/start":
-            _kill_pytest()
-            _user_stopped.clear()
-            broadcast(0, "Starting...", running=True)
-
-            try:
-                global pytest_process
-                with pytest_lock:
-                    pytest_process = subprocess.Popen(
-                        [sys.executable, "-m", "pytest",
-                         TEST_FILE, "-v", "--tb=short"],
-                        cwd=SCRIPT_DIR,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                    )
-                threading.Thread(target=monitor_pytest, daemon=True).start()
-                print(f"  >> Started pytest (PID {pytest_process.pid})")
-            except Exception as e:
-                broadcast(0, f"Failed to start: {e}", running=False)
-                print(f"  >> Failed to start pytest: {e}")
-
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
-
-        elif self.path == "/stop":
-            _user_stopped.set()
-            _kill_pytest()
-            broadcast(0, "Stopped by user", running=False)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
-            print("  >> Stop received from browser")
-
-        elif self.path == "/scenario":
+        if self.path == "/scenario":
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length)
             try:
@@ -212,18 +173,24 @@ def main():
     server = http.server.ThreadingHTTPServer(("localhost", PORT), Handler)
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
+
+    # Start console log monitor
+    console_thread = threading.Thread(target=monitor_console_log, daemon=True)
+    console_thread.start()
+
     print(f"Scenario server running on http://localhost:{PORT}")
     print(f"Open http://localhost:{PORT} in Chrome/Edge.")
+    print("Run 'pytest SystemLevel_Scenarios.py' to execute tests.")
+    print("Console output will stream to browser if written to pytest_console.log")
     print("Press Ctrl+C to stop the server.\n")
 
-    broadcast(0, "Waiting for Start Test...", running=False)
+    broadcast(0, "Ready - Run pytest to start", running=False)
 
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nShutting down...")
-        _kill_pytest()
     finally:
         server.shutdown()
 
