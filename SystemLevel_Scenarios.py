@@ -3,6 +3,7 @@ import json
 import time
 import urllib.request
 from pathlib import Path
+from datetime import datetime
 
 from typhoon.api.schematic_editor import SchematicAPI
 
@@ -91,6 +92,9 @@ FILE_DIR_PATH = Path(__file__).parent
 model_path = str(FILE_DIR_PATH / "SystemLevel_V2.tse")
 compiled_model_path = model.get_compiled_model_file(model_path)
 
+# Results folder for .mat files (set during test setup)
+RESULTS_FOLDER = None
+
 def set_resistor_value(resistor_name, new_r_value):
     """Set resistance of an existing resistor in the schematic."""
 
@@ -141,6 +145,14 @@ def set_inductor_value(inductor_name, new_L_value):
 # Fixture to load schematic, compile and load compiled model to HIL device
 @pytest.fixture(scope="module")
 def setup():
+    global RESULTS_FOLDER
+
+    # Create timestamped results folder
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    RESULTS_FOLDER = FILE_DIR_PATH / f"Test_Results_{timestamp}"
+    RESULTS_FOLDER.mkdir(exist_ok=True)
+    print(f"\n  >> Results will be saved to: {RESULTS_FOLDER}")
+
     model.load(model_path)
 
     try:
@@ -159,7 +171,7 @@ def setup():
     set_resistor_value("R34", 2000)
     set_inductor_value("Lgrid",0)
     # set_inductor_value("Lgrid1",0)
-    
+
     model.compile()
 
     hil.load_model(compiled_model_path, vhil_device=vhil_device)
@@ -169,7 +181,7 @@ def setup():
     hil.set_scada_input_value("Load_Dist", 0)
 
 
-    
+
     summary_data = []
     yield summary_data
     
@@ -185,13 +197,15 @@ def pre_cbk(label):
     channelSettings = ["Ig1","L4","Vc3", "C2","C3","C4","Cdc","Ia3","VLV2"]
     # regular Python list is used for data buffer
     capturedDataBuffer = []
+    # Save to timestamped results folder
+    output_file = str(RESULTS_FOLDER / f'{label}.mat')
     # start capture process and if everything is ok continue...
     hil.start_capture(
         captureSettings,
         triggerSettings,
         channelSettings,
         dataBuffer=capturedDataBuffer,
-        fileName=str(FILE_DIR_PATH / f'{label}.mat'))
+        fileName=output_file)
 
 def post_cbk(label):
     hil.stop_capture()

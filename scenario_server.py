@@ -22,12 +22,17 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HTML_FILE = os.path.join(SCRIPT_DIR, "Modbus_Bus_Sniffer.html")
 CONSOLE_LOG = os.path.join(SCRIPT_DIR, "pytest_console.log")
 
+HEARTBEAT_TIMEOUT = 5  # Consider tests dead after 5 seconds without heartbeat
+
 current_scenario = {"scenario": 0, "label": "Ready - Run pytest to start", "running": False}
 sse_clients = []
 lock = threading.Lock()
 
 console_clients = []
 console_lock = threading.Lock()
+
+last_heartbeat_time = None
+heartbeat_lock = threading.Lock()
 
 
 def broadcast(scenario_num, label, running=True):
@@ -76,6 +81,24 @@ def monitor_console_log():
         except Exception as e:
             pass
         time.sleep(0.5)
+
+
+def monitor_heartbeat():
+    """Monitor heartbeat and auto-reset if tests stop unexpectedly."""
+    global last_heartbeat_time, current_scenario
+
+    while True:
+        time.sleep(1)
+
+        with heartbeat_lock:
+            if last_heartbeat_time is not None:
+                elapsed = time.time() - last_heartbeat_time
+
+                # If heartbeat timeout and tests were running, reset display
+                if elapsed > HEARTBEAT_TIMEOUT and current_scenario.get("running", False):
+                    print(f"  >> Heartbeat timeout ({elapsed:.1f}s) - Tests stopped unexpectedly")
+                    last_heartbeat_time = None
+                    broadcast(0, "Tests stopped unexpectedly", running=False)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -174,6 +197,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b'{"ok":true}')
 
+        elif self.path == "/heartbeat":
+            global last_heartbeat_time
+            with heartbeat_lock:
+                last_heartbeat_time = time.time()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+
         else:
             self.send_response(404)
             self.end_headers()
@@ -191,10 +223,15 @@ def main():
     console_thread = threading.Thread(target=monitor_console_log, daemon=True)
     console_thread.start()
 
+    # Start heartbeat monitor
+    heartbeat_thread = threading.Thread(target=monitor_heartbeat, daemon=True)
+    heartbeat_thread.start()
+
     print(f"Scenario server running on http://localhost:{PORT}")
     print(f"Open http://localhost:{PORT} in Chrome/Edge.")
     print("Run 'pytest SystemLevel_Scenarios.py' to execute tests.")
     print("Console output will stream to browser if written to pytest_console.log")
+    print("Heartbeat monitoring enabled - will auto-detect test crashes")
     print("Press Ctrl+C to stop the server.\n")
 
     broadcast(0, "Ready - Run pytest to start", running=False)
