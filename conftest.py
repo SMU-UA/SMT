@@ -76,3 +76,17 @@ def pytest_unconfigure(config: Config):
             config._console_log_file.close()
         except:
             pass
+
+    # Notify SMT server that all tests are complete
+    import json
+    import urllib.request
+    payload = json.dumps({"scenario": 0, "label": "All tests complete", "running": False}).encode("utf-8")
+    req = urllib.request.Request(
+        "http://localhost:8765/scenario",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass  # Server not running - tests still work standalone

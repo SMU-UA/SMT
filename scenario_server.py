@@ -163,8 +163,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 data = json.loads(body)
                 scenario_num = data.get("scenario", 0)
                 label = data.get("label", "")
-                broadcast(scenario_num, label, running=True)
-                print(f"  >> Scenario {scenario_num}: {label}")
+                running = data.get("running", True)  # Default to True if not specified
+                broadcast(scenario_num, label, running=running)
+                status = "complete" if not running else "running"
+                print(f"  >> Scenario {scenario_num}: {label} [{status}]")
             except Exception as e:
                 print(f"  >> Bad /scenario payload: {e}")
             self.send_response(200)

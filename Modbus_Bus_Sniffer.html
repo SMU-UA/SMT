@@ -912,10 +912,15 @@
                     dot.classList.toggle('active', data.scenario > 0);
                 }
 
-                // Update label when scenarios finish (recording continues until manual Stop Log)
+                // Auto-stop log and save CSV when all tests finish
                 if (data.running === false && dataLogRecording && dataLogSeenRunning) {
-                    document.getElementById('scLabel').textContent = 'Test complete';
+                    document.getElementById('scLabel').textContent = 'Test complete - Auto-saved';
                     document.getElementById('scDot').classList.remove('active');
+                    // Auto-save CSV and stop recording
+                    if (dataLogRows.length > 0) {
+                        downloadDataLog();
+                    }
+                    stopDataLog();
                 }
 
                 // Add scenario marker to communication log
