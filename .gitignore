@@ -1,3 +1,17 @@
 .claude/
 __pycache__/
 nul
+
+# Temporary editor files
+*.tmp.*
+
+# Test results
+Test_Results_*/
+pytest_console.log
+
+# Allure reports
+allure-html/
+report/
+
+# Build artifacts
+*Target files/
