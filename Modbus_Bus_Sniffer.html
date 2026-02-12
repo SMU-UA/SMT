@@ -791,7 +791,7 @@
         const DATALOG_SKIP = new Set(['LIVE', 'R1', 'R2', 'R3', 'R4', 'R5', 'TEMPC', 'T2', 'INVLIVE', 'CHLIVE', 'TEMPE']);
         const DATALOG_NO_SCALE = new Set(['SSRS', 'FCODE', 'FTRIG', 'FFLAG', 'STATE', 'FCC', 'FFC', 'INVCOMMAND', 'CHCOMMAND', 'HRELAY', 'GENS']);
         const DATALOG_S3_INDICES = S3_WRITE_LABELS.map((l, i) => i).filter(i => !DATALOG_SKIP.has(S3_WRITE_LABELS[i]));
-        const DATALOG_COLUMNS = ['Time(s)', 'Scenario', ...DATALOG_S3_INDICES.map(i => S3_WRITE_LABELS[i])];
+        const DATALOG_COLUMNS = ['Time(s)', 'Scenario', 'Label', ...DATALOG_S3_INDICES.map(i => S3_WRITE_LABELS[i])];
 
         function initDataLogTable() {
             const head = document.getElementById('datalogHead');
@@ -801,8 +801,9 @@
         function captureDataLogRow() {
             const elapsed = ((Date.now() - dataLogStartTime) / 1000).toFixed(1);
             const scNum = document.getElementById('scNum').textContent || '0';
+            const scLabel = document.getElementById('scLabel').textContent || '';
 
-            const vals = [elapsed, scNum];
+            const vals = [elapsed, scNum, scLabel];
             for (const i of DATALOG_S3_INDICES) {
                 const el = document.getElementById('s3w' + i);
                 const raw = el ? el.textContent : '--';
@@ -818,7 +819,7 @@
             vals.forEach((v, idx) => {
                 const td = document.createElement('td');
                 td.textContent = v;
-                if (idx === 1) td.className = 'sc-col';
+                if (idx === 1 || idx === 2) td.className = 'sc-col';
                 tr.appendChild(td);
             });
             tbody.appendChild(tr);
@@ -917,8 +918,8 @@
                     document.getElementById('scDot').classList.remove('active');
                 }
 
-                // Add marker to log only when test is running
-                if (data.scenario > 0 && dataLogRecording) {
+                // Add scenario marker to communication log
+                if (data.scenario > 0) {
                     const log = document.getElementById('logPanel');
                     const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
                     const marker = document.createElement('div');
@@ -928,6 +929,7 @@
                     marker.innerHTML = `<span class="log-time">[${time}]</span> <b style="color:#aa55ff">SCENARIO #${data.scenario}: ${data.label}</b>`;
                     log.appendChild(marker);
                     log.scrollTop = log.scrollHeight;
+                    logCount++;
                 }
             };
             evtSource.onerror = () => {

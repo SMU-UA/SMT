@@ -130,6 +130,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with console_lock:
                 console_clients.append(self.wfile)
 
+            # Send existing log content to new client
+            try:
+                if os.path.exists(CONSOLE_LOG):
+                    with open(CONSOLE_LOG, 'r', encoding='utf-8', errors='replace') as f:
+                        for line in f:
+                            msg = f"data: {json.dumps({'line': line.rstrip()})}\n\n"
+                            self.wfile.write(msg.encode())
+                        self.wfile.flush()
+            except:
+                pass
+
             try:
                 while True:
                     time.sleep(1)

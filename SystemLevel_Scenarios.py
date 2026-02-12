@@ -88,7 +88,7 @@ def report_scenario(scenario_num, label=""):
 FILE_DIR_PATH = Path(__file__).parent
 
 # Path to model file and to compiled model file
-model_path = str(FILE_DIR_PATH / "SystemLevel_V3_SMU.tse")
+model_path = str(FILE_DIR_PATH / "SystemLevel_V2.tse")
 compiled_model_path = model.get_compiled_model_file(model_path)
 
 def set_resistor_value(resistor_name, new_r_value):

@@ -10,9 +10,18 @@ echo.
 
 :: Find Typhoon HIL Python
 set "PYTHON="
+:: Check C:\Program Files first
 for /d %%D in ("C:\Program Files\Typhoon HIL Control Center*") do (
     if exist "%%D\python3_portable\python.exe" (
         set "PYTHON=%%D\python3_portable\python.exe"
+    )
+)
+:: Check D:\Typhoon if not found
+if not defined PYTHON (
+    for /d %%D in ("D:\Typhoon\Typhoon HIL Control Center*") do (
+        if exist "%%D\python3_portable\python.exe" (
+            set "PYTHON=%%D\python3_portable\python.exe"
+        )
     )
 )
 
