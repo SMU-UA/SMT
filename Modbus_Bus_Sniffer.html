@@ -901,12 +901,13 @@
                 // Only update scenario display when test is running
                 if (dataLogRecording) {
                     if (data.running === true) dataLogSeenRunning = true;
-                    document.getElementById('scLabel').textContent = data.label || '';
+                    document.getElementById('scLabel').textContent = data.running === 'paused'
+                        ? data.label + ' (paused)' : (data.label || '');
                     const dot = document.getElementById('scDot');
                     dot.classList.toggle('active', data.running === true);
                 }
 
-                // Auto-stop log and save CSV when all tests finish
+                // Auto-stop log and save CSV when all tests finish (not on paused)
                 if (data.running === false && dataLogRecording && dataLogSeenRunning) {
                     document.getElementById('scLabel').textContent = 'Test complete - Auto-saved';
                     document.getElementById('scDot').classList.remove('active');

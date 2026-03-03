@@ -122,12 +122,8 @@ class CsvSplitterApp:
 
         saved = 0
         for label, group_df in groups:
-            # Build filename: LabelName_datetime.csv
             safe_label = str(label).strip()
-            if self.datetime_str:
-                filename = f"{safe_label}_{self.datetime_str}.csv"
-            else:
-                filename = f"{safe_label}.csv"
+            filename = f"{safe_label}.csv"
 
             out_path = os.path.join(self.output_folder, filename)
             group_df.to_csv(out_path, index=False)

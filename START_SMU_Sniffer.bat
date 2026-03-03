@@ -24,6 +24,14 @@ if not defined PYTHON (
         )
     )
 )
+:: Check D:\Typhoon Centre if not found
+if not defined PYTHON (
+    for /d %%D in ("D:\Typhoon Centre\Typhoon HIL Control Center*") do (
+        if exist "%%D\python3_portable\python.exe" (
+            set "PYTHON=%%D\python3_portable\python.exe"
+        )
+    )
+)
 
 if not defined PYTHON (
     echo  ERROR: Typhoon HIL Control Center not found!

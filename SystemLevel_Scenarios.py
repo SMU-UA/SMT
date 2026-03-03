@@ -72,9 +72,9 @@ Stiff = 0
 Weak = 1e-3
 
 # --- Scenario reporting to SMT server ---
-def report_scenario(label):
+def report_scenario(label, running=True):
     """Report the current scenario to the SMT server (if running)."""
-    payload = json.dumps({"label": label}).encode("utf-8")
+    payload = json.dumps({"label": label, "running": running}).encode("utf-8")
     req = urllib.request.Request(
         "http://localhost:8765/scenario",
         data=payload,
@@ -202,6 +202,7 @@ def pre_cbk(label):
 
 def post_cbk(label):
     hil.stop_capture()
+    report_scenario(label, running="paused")
     
 # Scenario_data=[(1,10),(2,8),(3,6),(4,5),(5,4),(6,3),(7,2),(8,1),(9,0.5),(10,0.2)]
 Scenario_data=[(1,10),(2,8)]
