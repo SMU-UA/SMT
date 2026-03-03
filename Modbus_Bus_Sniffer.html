@@ -784,6 +784,7 @@
         let dataLogRows = [];
         let dataLogTimer = null;
         let dataLogRecording = false;
+        let dataLogPaused = false;
         let dataLogStartTime = 0;
         let dataLogSeenRunning = false;
         const DATALOG_SKIP = new Set(['LIVE', 'R1', 'R2', 'R3', 'R4', 'R5', 'TEMPC', 'T2', 'INVLIVE', 'CHLIVE', 'TEMPE']);
@@ -797,6 +798,7 @@
         }
 
         function captureDataLogRow() {
+            if (dataLogPaused) return;
             const elapsed = ((Date.now() - dataLogStartTime) / 1000).toFixed(1);
             const scLabel = document.getElementById('scLabel').textContent || '';
 
@@ -896,6 +898,13 @@
                 // Auto-start logging when first scenario arrives
                 if (data.label && data.running === true && !dataLogRecording) {
                     startDataLog();
+                }
+
+                // Pause/resume data logging
+                if (data.running === 'paused') {
+                    dataLogPaused = true;
+                } else if (data.running === true) {
+                    dataLogPaused = false;
                 }
 
                 // Only update scenario display when test is running
