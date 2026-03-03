@@ -25,7 +25,7 @@ def send_test_stopped():
     import json
     import urllib.request
     try:
-        payload = json.dumps({"scenario": 0, "label": "Tests stopped", "running": False}).encode("utf-8")
+        payload = json.dumps({"label": "Tests stopped", "running": False}).encode("utf-8")
         req = urllib.request.Request(
             "http://localhost:8765/scenario",
             data=payload,
@@ -151,7 +151,7 @@ def pytest_unconfigure(config: Config):
     # Notify SMT server that all tests are complete
     import json
     import urllib.request
-    payload = json.dumps({"scenario": 0, "label": "All tests complete", "running": False}).encode("utf-8")
+    payload = json.dumps({"label": "All tests complete", "running": False}).encode("utf-8")
     req = urllib.request.Request(
         "http://localhost:8765/scenario",
         data=payload,

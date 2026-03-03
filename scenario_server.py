@@ -1,6 +1,6 @@
 """
 Scenario server that serves the Modbus sniffer page and broadcasts
-the current test scenario number — all from one URL.
+the current test scenario label — all from one URL.
 
 Usage:
     "C:\\Program Files\\Typhoon HIL Control Center 2025.4\\python3_portable\\python.exe" scenario_server.py
@@ -24,7 +24,7 @@ CONSOLE_LOG = os.path.join(SCRIPT_DIR, "pytest_console.log")
 
 HEARTBEAT_TIMEOUT = 5  # Consider tests dead after 5 seconds without heartbeat
 
-current_scenario = {"scenario": 0, "label": "Ready - Run pytest to start", "running": False}
+current_scenario = {"label": "Ready - Run pytest to start", "running": False}
 sse_clients = []
 lock = threading.Lock()
 
@@ -35,9 +35,9 @@ last_heartbeat_time = None
 heartbeat_lock = threading.Lock()
 
 
-def broadcast(scenario_num, label, running=True):
+def broadcast(label, running=True):
     global current_scenario
-    current_scenario = {"scenario": scenario_num, "label": label, "running": running}
+    current_scenario = {"label": label, "running": running}
     msg = f"data: {json.dumps(current_scenario)}\n\n".encode()
     with lock:
         dead = []
@@ -98,7 +98,7 @@ def monitor_heartbeat():
                 if elapsed > HEARTBEAT_TIMEOUT and current_scenario.get("running", False):
                     print(f"  >> Heartbeat timeout ({elapsed:.1f}s) - Tests stopped unexpectedly")
                     last_heartbeat_time = None
-                    broadcast(0, "Tests stopped unexpectedly", running=False)
+                    broadcast("Tests stopped unexpectedly", running=False)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -184,12 +184,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             try:
                 data = json.loads(body)
-                scenario_num = data.get("scenario", 0)
                 label = data.get("label", "")
                 running = data.get("running", True)  # Default to True if not specified
-                broadcast(scenario_num, label, running=running)
+                broadcast(label, running=running)
                 status = "complete" if not running else "running"
-                print(f"  >> Scenario {scenario_num}: {label} [{status}]")
+                print(f"  >> {label} [{status}]")
             except Exception as e:
                 print(f"  >> Bad /scenario payload: {e}")
             self.send_response(200)
@@ -234,7 +233,7 @@ def main():
     print("Heartbeat monitoring enabled - will auto-detect test crashes")
     print("Press Ctrl+C to stop the server.\n")
 
-    broadcast(0, "Ready - Run pytest to start", running=False)
+    broadcast("Ready - Run pytest to start", running=False)
 
     try:
         while True:
