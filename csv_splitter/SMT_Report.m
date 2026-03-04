@@ -1,4 +1,7 @@
 function SMT_Report()
+close all
+clc
+rehash toolboxcache
 %SMT_REPORT  GUI tool that splits dashboard CSV and generates IEEE-style
 %            reports by combining HIL .mat data with SMT Modbus CSV data.
 %
@@ -61,7 +64,7 @@ titleFont = 9;
 lineW     = 1.1;
 
 % ===================== build GUI =========================================
-hFig = figure('Name','SMT Report Generator', ...
+hFig = uifigure('Name','SMT Report Generator', ...
     'NumberTitle','off', ...
     'MenuBar','none', ...
     'ToolBar','none', ...

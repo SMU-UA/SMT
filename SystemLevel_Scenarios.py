@@ -139,8 +139,8 @@ def setup():
 
     # Create timestamped results folder
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    RESULTS_FOLDER = FILE_DIR_PATH / f"Test_Results_{timestamp}"
-    RESULTS_FOLDER.mkdir(exist_ok=True)
+    RESULTS_FOLDER = FILE_DIR_PATH / "Results" / f"Test_Results_{timestamp}"
+    RESULTS_FOLDER.mkdir(parents=True, exist_ok=True)
     print(f"\n  >> Results will be saved to: {RESULTS_FOLDER}")
 
     model.load(model_path)
