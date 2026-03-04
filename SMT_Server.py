@@ -19,7 +19,7 @@ import time
 
 PORT = 8765
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-HTML_FILE = os.path.join(SCRIPT_DIR, "Modbus_Bus_Sniffer.html")
+HTML_FILE = os.path.join(SCRIPT_DIR, "SMT_Dashboard.html")
 CONSOLE_LOG = os.path.join(SCRIPT_DIR, "pytest_console.log")
 
 HEARTBEAT_TIMEOUT = 5  # Consider tests dead after 5 seconds without heartbeat

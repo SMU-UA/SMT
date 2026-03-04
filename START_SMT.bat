@@ -55,7 +55,7 @@ echo.
 start "" cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:8765"
 
 :: Run the server (blocks until Ctrl+C)
-"%PYTHON%" "%~dp0scenario_server.py"
+"%PYTHON%" "%~dp0SMT_Server.py"
 
 echo.
 echo  Server stopped.
