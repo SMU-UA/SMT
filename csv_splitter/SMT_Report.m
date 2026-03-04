@@ -147,6 +147,7 @@ labelRows = [];
         defaultDir = fullfile(getenv('USERPROFILE'),'Downloads');
         if ~isfolder(defaultDir), defaultDir = pwd; end
         [f,p] = uigetfile({'*.csv','CSV files'},'Select Dashboard CSV', defaultDir);
+        figure(hFig);  % bring GUI back to front
         if isequal(f,0), return; end
         csvPath = fullfile(p,f);
         set(hCsvLabel,'String',csvPath);
@@ -156,6 +157,7 @@ labelRows = [];
 
     function browseFolder(~,~)
         d = uigetdir(pwd,'Select Test Results Folder');
+        figure(hFig);  % bring GUI back to front
         if isequal(d,0), return; end
         folderPath = d;
         set(hFolderLabel,'String',folderPath);
@@ -215,32 +217,31 @@ labelRows = [];
 
     function generateReports(~,~)
         set(hGenBtn,'Enable','off');
-        set(hStatus,'String','Splitting CSV...');
+        set(hStatus,'String','Generating plots...');
         drawnow;
 
-        % --- Step 1: split CSV by label and save to results folder ---
+        % --- Step 1: split CSV in memory (no files saved) ---
         mask = strtrim(rawTable.Label) ~= "Logging...";
         filtered = rawTable(mask,:);
         splitLabels = unique(strtrim(filtered.Label),'stable');
+
+        % build a map: label -> table of rows (in memory only)
+        csvMap = containers.Map();
         for k = 1:numel(splitLabels)
             lbl = splitLabels{k};
-            rows = filtered(strtrim(filtered.Label)==lbl,:);
-            outFile = fullfile(folderPath, lbl + ".csv");
-            writetable(rows, outFile);
+            csvMap(char(lbl)) = filtered(strtrim(filtered.Label)==lbl,:);
         end
-        set(hStatus,'String', ...
-            sprintf('Saved %d CSV files. Generating plots...', numel(splitLabels)));
-        drawnow;
 
         % --- Step 2: plot each scenario ---
         figIdx = 0;
         plotCount = 0;
+        skipped = 0;
 
         for j = 1:numel(FileNameBase)
             base = FileNameBase{j};
             scName = ScenarioName{j};
 
-            % find all scenario numbers for this base
+            % find all scenario numbers for this base from CSV labels
             nums = [];
             for k = 1:numel(splitLabels)
                 tok = regexp(splitLabels{k}, ['^' regexptranslate('escape',base) '_(\d+)$'],'tokens');
@@ -253,10 +254,11 @@ labelRows = [];
 
             for s = nums
                 matFile = fullfile(folderPath, sprintf('%s_%d.mat',base,s));
-                csvFile = fullfile(folderPath, sprintf('%s_%d.csv',base,s));
+                csvKey = sprintf('%s_%d',base,s);
 
                 if ~isfile(matFile)
                     warning('MAT file not found: %s', matFile);
+                    skipped = skipped + 1;
                     continue
                 end
 
@@ -264,12 +266,13 @@ labelRows = [];
                     sprintf('Plotting %s – Scenario %d ...', scName, s));
                 drawnow;
 
+                % load HIL data from .mat
                 matData = load(matFile);
 
-                % read SMT csv if available
-                hasCSV = isfile(csvFile);
+                % get SMT data from in-memory map
+                hasCSV = csvMap.isKey(csvKey);
                 if hasCSV
-                    STM = readtable(csvFile);
+                    STM = csvMap(csvKey);
                 end
 
                 % ---- figure ----
@@ -361,8 +364,8 @@ labelRows = [];
         end
 
         set(hStatus,'String', ...
-            sprintf('Done!  %d CSV files split,  %d reports generated in: %s', ...
-            numel(splitLabels), plotCount, folderPath));
+            sprintf('Done!  %d reports generated,  %d skipped (no .mat) — output: %s', ...
+            plotCount, skipped, folderPath));
         set(hGenBtn,'Enable','on');
     end
 
