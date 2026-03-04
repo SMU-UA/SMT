@@ -5,7 +5,7 @@ the current test scenario label — all from one URL.
 Usage:
     "C:\\Program Files\\Typhoon HIL Control Center 2025.4\\python3_portable\\python.exe" scenario_server.py
 
-    Then open http://localhost:8765 in Chrome/Edge.
+    Then open http://localhost:8780 in Chrome/Edge.
 
     Run pytest SystemLevel_Scenarios.py separately to execute tests.
     The server will receive and broadcast scenario updates.
@@ -17,7 +17,7 @@ import os
 import threading
 import time
 
-PORT = 8765
+PORT = 8780
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 HTML_FILE = os.path.join(SCRIPT_DIR, "SMT_Dashboard.html")
 CONSOLE_LOG = os.path.join(SCRIPT_DIR, "pytest_console.log")
@@ -173,6 +173,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 with console_lock:
                     if self.wfile in console_clients:
                         console_clients.remove(self.wfile)
+
+        elif self.path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
 
         else:
             self.send_response(404)

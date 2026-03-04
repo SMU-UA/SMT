@@ -9,7 +9,7 @@ This tool sniffs Modbus RTU traffic on the serial bus between three slaves (S1_I
 ## Quick Start
 
 1. Double-click **`START_SMU_Sniffer.bat`**
-2. Browser opens automatically at `http://localhost:8765`
+2. Browser opens automatically at `http://localhost:8780`
 3. Click **Connect Serial** and select the Modbus RTU COM port
 4. Run `pytest SystemLevel_Scenarios.py` from Typhoon HIL IDE console
 5. Data logging starts automatically when first scenario arrives
@@ -73,7 +73,7 @@ No other software or Python packages need to be installed.
 ## Architecture
 
 ```
-Browser (Chrome/Edge)          Python Server (localhost:8765)        Typhoon HIL IDE
+Browser (Chrome/Edge)          Python Server (localhost:8780)        Typhoon HIL IDE
 +-----------------------+      +-------------------------+      +-------------------------+
 | Modbus Sniffer (HTML) |      | scenario_server.py      |      | pytest console          |
 |                       |      |                         |      |                         |

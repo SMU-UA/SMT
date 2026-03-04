@@ -27,7 +27,7 @@ def send_test_stopped():
     try:
         payload = json.dumps({"label": "Tests stopped", "running": False}).encode("utf-8")
         req = urllib.request.Request(
-            "http://localhost:8765/scenario",
+            "http://localhost:8780/scenario",
             data=payload,
             headers={"Content-Type": "application/json"},
         )
@@ -42,7 +42,7 @@ def send_heartbeat():
     import urllib.request
     try:
         req = urllib.request.Request(
-            "http://localhost:8765/heartbeat",
+            "http://localhost:8780/heartbeat",
             data=b'{}',
             headers={"Content-Type": "application/json"},
         )
@@ -153,7 +153,7 @@ def pytest_unconfigure(config: Config):
     import urllib.request
     payload = json.dumps({"label": "All tests complete", "running": False}).encode("utf-8")
     req = urllib.request.Request(
-        "http://localhost:8765/scenario",
+        "http://localhost:8780/scenario",
         data=payload,
         headers={"Content-Type": "application/json"},
     )

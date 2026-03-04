@@ -33,12 +33,23 @@ if not defined PYTHON (
     )
 )
 
+:: Fall back to system Python if Typhoon not found
 if not defined PYTHON (
-    echo  ERROR: Typhoon HIL Control Center not found!
-    echo  Please install Typhoon HIL Control Center first.
-    echo.
-    pause
-    exit /b 1
+    python --version >nul 2>nul
+    if not errorlevel 1 (
+        set "PYTHON=python"
+    ) else (
+        python3 --version >nul 2>nul
+        if not errorlevel 1 (
+            set "PYTHON=python3"
+        ) else (
+            echo  ERROR: No Python found!
+            echo  Install Typhoon HIL Control Center or Python 3.
+            echo.
+            pause
+            exit /b 1
+        )
+    )
 )
 
 echo  Found Python: %PYTHON%
@@ -52,7 +63,7 @@ echo  -----------------------------------------------
 echo.
 
 :: Open browser after 2 second delay
-start "" cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:8765"
+start "" cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:8780"
 
 :: Run the server (blocks until Ctrl+C)
 "%PYTHON%" "%~dp0SMT_Server.py"

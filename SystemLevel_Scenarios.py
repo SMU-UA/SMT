@@ -76,7 +76,7 @@ def report_scenario(label, running=True):
     """Report the current scenario to the SMT server (if running)."""
     payload = json.dumps({"label": label, "running": running}).encode("utf-8")
     req = urllib.request.Request(
-        "http://localhost:8765/scenario",
+        "http://localhost:8780/scenario",
         data=payload,
         headers={"Content-Type": "application/json"},
     )
