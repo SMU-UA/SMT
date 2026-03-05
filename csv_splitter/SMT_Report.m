@@ -1,4 +1,5 @@
 function SMT_Report()
+clear all
 close all
 clc
 rehash toolboxcache
@@ -159,7 +160,9 @@ labelRows = [];
     end
 
     function browseFolder(~,~)
-        d = uigetdir(pwd,'Select Test Results Folder');
+        projectRoot = fileparts(fileparts(pwd));  % Go up two levels
+        resultsDir = fullfile(projectRoot,'Results');
+        d = uigetdir(resultsDir,'Select Test Results Folder');
         figure(hFig);  % bring GUI back to front
         if isequal(d,0), return; end
         folderPath = d;
